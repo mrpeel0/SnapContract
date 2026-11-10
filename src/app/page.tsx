@@ -1,69 +1,146 @@
-import Image from "next/image";
+"use client";
+import Link from "next/link";
+import { motion } from "framer-motion";
+import { useEffect, useState } from "react";
+import { ArrowRight, Check, FileSignature, MessageSquareText, Plus, ReceiptText, Sparkles, Zap } from "lucide-react";
+import { Button, Card, Logo, timeAgo } from "@/components/ui";
+import { money } from "@/lib/pricing";
+
+interface Row {
+  id: string;
+  name: string;
+  address: string;
+  client: string;
+  status: string;
+  budget: { current: number; pending: number; approvedCount: number };
+  needsAttention: number;
+  lastMessage: string;
+}
+
+const STEPS = [
+  { icon: MessageSquareText, t: "Client asks in chat", d: "“Can we add 2 outlets on the island?”" },
+  { icon: Sparkles, t: "Agent prices it", d: "Matched to your rate sheet, +10% O&P" },
+  { icon: Check, t: "Client approves", d: "Signed right in the conversation" },
+  { icon: ReceiptText, t: "Invoice updates", d: "New version, approval attached" },
+];
 
 export default function Home() {
+  const [rows, setRows] = useState<Row[]>([]);
+  const [ai, setAi] = useState<"claude" | "local" | null | undefined>(undefined);
+  const [step, setStep] = useState(0);
+
+  useEffect(() => {
+    fetch("/api/projects").then((r) => r.json()).then((j) => {
+      setRows(j.projects);
+      setAi(j.ai);
+    });
+    const t = setInterval(() => setStep((s) => (s + 1) % STEPS.length), 1800);
+    return () => clearInterval(t);
+  }, []);
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <div className="min-h-screen grain">
+      <section className="blueprint text-white">
+        <div className="max-w-6xl mx-auto px-6 pt-6 pb-20">
+          <div className="flex items-center justify-between">
+            <Logo className="text-white text-lg" />
+            {ai !== undefined && (
+              <span className={`text-[12px] rounded-full px-3 py-1 font-semibold inline-flex items-center gap-1 ${ai ? "bg-agent/30 text-white" : "bg-white/10 text-white/70"}`}>
+                {ai ? <Sparkles className="h-3 w-3" /> : <Zap className="h-3 w-3" />} {ai === "claude" ? "Claude connected" : ai === "local" ? "Local model connected" : "Offline demo engine"}
+              </span>
+            )}
+          </div>
+          <div className="mt-16 grid lg:grid-cols-[1.1fr_1fr] gap-12 items-center">
+            <div>
+              <motion.h1 initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} className="text-5xl md:text-6xl font-semibold tracking-tight leading-[1.02]">
+                Every “can we also…”<br />
+                <span className="bg-gradient-to-r from-accent via-accent-2 to-agent-2 bg-clip-text text-transparent">priced, approved, invoiced.</span>
+              </motion.h1>
+              <motion.p initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="mt-5 text-white/70 text-lg max-w-xl">
+                SnapContract&apos;s agent lives in the contractor-client conversation. It catches scope changes in texts, voice notes and call transcripts, prices them from your rate sheet and gets them signed before work starts.
+              </motion.p>
+              <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="mt-8 flex flex-wrap gap-3">
+                <Link href="/projects/maple-kitchen?tab=chat&as=client">
+                  <Button size="lg">Open live demo <ArrowRight className="h-4 w-4" /></Button>
+                </Link>
+                <Link href="/projects/new">
+                  <Button size="lg" variant="outline" className="!bg-white/10 !border-white/20 text-white hover:!bg-white/15">
+                    <Plus className="h-4 w-4" /> Start a project
+                  </Button>
+                </Link>
+              </motion.div>
+            </div>
+            <div className="relative">
+              <div className="absolute -inset-8 bg-gradient-to-br from-accent/30 to-agent/30 blur-3xl rounded-full" />
+              <div className="relative space-y-3">
+                {STEPS.map((s, i) => {
+                  const Icon = s.icon;
+                  const active = i === step;
+                  return (
+                    <motion.div
+                      key={s.t}
+                      animate={{ scale: active ? 1.03 : 1, opacity: active ? 1 : 0.55, x: active ? 8 : 0 }}
+                      transition={{ type: "spring", stiffness: 260, damping: 22 }}
+                      className={`flex items-center gap-4 rounded-2xl border px-4 py-3.5 backdrop-blur ${active ? "bg-white text-ink border-white" : "bg-white/5 border-white/10"}`}
+                    >
+                      <div className={`h-10 w-10 rounded-xl grid place-items-center ${active ? "bg-gradient-to-br from-agent to-agent-2 text-white" : "bg-white/10"}`}>
+                        <Icon className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <div className="font-semibold text-[15px]">{s.t}</div>
+                        <div className={`text-[13px] ${active ? "text-muted" : "text-white/60"}`}>{s.d}</div>
+                      </div>
+                      <span className="ml-auto font-mono text-[11px] opacity-50">0{i + 1}</span>
+                    </motion.div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+      </section>
+
+      <section className="max-w-6xl mx-auto px-6 -mt-10 pb-20 relative">
+        <div className="flex items-end justify-between mb-4">
+          <h2 className="text-xl font-semibold tracking-tight text-white drop-shadow md:text-ink md:drop-shadow-none md:mt-14">Projects</h2>
+          <Link href="/projects/new">
+            <Button size="sm" variant="dark"><Plus className="h-3.5 w-3.5" /> New project</Button>
+          </Link>
         </div>
-      </main>
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {rows.map((p, i) => (
+            <motion.div key={p.id} initial={{ opacity: 0, y: 14 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}>
+              <Link href={`/projects/${p.id}`}>
+                <Card className="p-5 hover:-translate-y-0.5 hover:shadow-xl transition-all">
+                  <div className="flex items-center justify-between">
+                    <span className={`text-[11px] font-semibold rounded-full px-2 py-0.5 ${p.status === "signed" ? "bg-good/12 text-[#067a55]" : "bg-agent/10 text-agent"}`}>
+                      {p.status === "signed" ? "Active" : p.status === "none" ? "Setup" : "Agreement draft"}
+                    </span>
+                    {p.needsAttention > 0 && <span className="text-[11px] font-semibold text-accent">{p.needsAttention} open change{p.needsAttention > 1 ? "s" : ""}</span>}
+                  </div>
+                  <div className="mt-3 font-semibold text-[16px]">{p.name}</div>
+                  <div className="text-[13px] text-muted">{p.address} · {p.client}</div>
+                  <div className="mt-4 flex items-end justify-between">
+                    <div>
+                      <div className="text-[11px] text-muted">Contract value</div>
+                      <div className="text-xl font-semibold tabular-nums">{money(p.budget.current, { cents: false })}</div>
+                    </div>
+                    <div className="text-[11.5px] text-muted">{timeAgo(p.lastMessage)}</div>
+                  </div>
+                </Card>
+              </Link>
+            </motion.div>
+          ))}
+          <Link href="/projects/new">
+            <div className="h-full min-h-[170px] rounded-2xl border-2 border-dashed border-line grid place-items-center text-muted hover:border-accent/50 hover:text-accent transition-colors">
+              <div className="text-center">
+                <FileSignature className="h-6 w-6 mx-auto" />
+                <div className="mt-2 text-sm font-medium">Draft a new agreement</div>
+              </div>
+            </div>
+          </Link>
+        </div>
+      </section>
     </div>
   );
 }
