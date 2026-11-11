@@ -1,6 +1,8 @@
 import { getProject, mutate, saveProject } from "./db";
 import { analyzeMessages, draftAgreement } from "./ai/agents";
-import { budget, quoteChange, money } from "./pricing";
+import { budget, materialsSpend, money, paymentImpact, quoteChange } from "./pricing";
+import { fundTransactions, issueMaterialsFund, rampConfigured } from "./ramp";
+import { notifyTelegram } from "./telegram";
 import { emptyAgreement, uid, SAMPLE_PRICE_SHEET } from "./seed";
 import type { ChangeLine, ChangeOrder, Message, MessageKind, PaymentMilestone, PriceItem, Project, Role, AgreementSection, LineItem } from "./types";
 
@@ -63,6 +65,11 @@ async function drain(projectId: string) {
       pp.agentStatus = "idle";
       pp.agentStatusText = undefined;
     });
+    try {
+      await notifyTelegram(projectId);
+    } catch (e) {
+      console.error("telegram notify", e);
+    }
   }
 }
 
@@ -145,9 +152,12 @@ export type Action =
   | { type: "declineChange"; coId: string; reason: string }
   | { type: "voidChange"; coId: string }
   | { type: "createManualChange" }
+  | { type: "issueMaterialCard"; coId: string }
+  | { type: "syncRamp" }
+  | { type: "linkTelegram"; role: Role; chatId: number }
   | { type: "updatePriceSheet"; items: PriceItem[] };
 
-export async function runAction(projectId: string, a: Action): Promise<Project> {
+async function applyAction(projectId: string, a: Action): Promise<Project> {
   switch (a.type) {
     case "postMessage": {
       const msg: Message = { id: uid("m"), author: a.author, kind: a.kind, body: a.body.trim(), createdAt: now() };
@@ -216,6 +226,7 @@ export async function runAction(projectId: string, a: Action): Promise<Project> 
     case "sendChange":
       return mutate(projectId, (pp) => {
         const co = find(pp, a.coId);
+        if (co.status === "client_review" || co.status === "approved") return;
         co.status = "client_review";
         co.question = undefined;
         co.history.push({ at: now(), actor: "contractor", action: "Reviewed & sent to client", note: money(quoteChange(pp, co).total) });
@@ -225,16 +236,21 @@ export async function runAction(projectId: string, a: Action): Promise<Project> 
     case "approveChange":
       return mutate(projectId, (pp) => {
         const co = find(pp, a.coId);
+        if (co.status === "approved") return;
+        const priorTotal = pp.invoices.at(-1)?.total ?? 0;
         const total = quoteChange(pp, co).total;
         co.status = "approved";
         co.approval = { name: a.name, at: now(), total };
         co.history.push({ at: now(), actor: "client", action: "Approved", note: `Signed by ${a.name}` });
         pushInvoice(pp, `CO-${co.number} approved`);
-        sysMsg(pp, `CO-${co.number} approved by ${a.name} · ${money(total, { sign: true })} · invoice updated to v${pp.invoices.length}`);
+        const flow = paymentImpact(pp.agreement.payments, budget(pp).current, priorTotal, pp.agreement.status === "signed", pp.invoices[0]?.total);
+        const draw = flow.next && flow.next.delta !== 0 ? ` · adds ${money(flow.next.delta, { sign: true })} to the next draw (${flow.next.label})` : "";
+        sysMsg(pp, `CO-${co.number} approved by ${a.name} · ${money(total, { sign: true })}${draw} · invoice updated to v${pp.invoices.length}`);
       });
     case "declineChange":
       return mutate(projectId, (pp) => {
         const co = find(pp, a.coId);
+        if (co.status === "declined" || co.status === "approved") return;
         co.status = "declined";
         co.declineReason = a.reason;
         co.history.push({ at: now(), actor: "client", action: "Declined", note: a.reason });
@@ -245,6 +261,65 @@ export async function runAction(projectId: string, a: Action): Promise<Project> 
         const co = find(pp, a.coId);
         co.status = "void";
         co.history.push({ at: now(), actor: "contractor", action: "Dismissed" });
+      });
+    case "issueMaterialCard": {
+      const preview = getProject(projectId);
+      if (!preview) throw new Error("Project not found");
+      const existing = find(preview, a.coId);
+      if (existing.status !== "approved") throw new Error("Approve the change before purchasing materials");
+      if ((preview.purchases ?? []).some((x) => x.changeOrderId === existing.id)) return preview;
+      const amount = materialsSpend(preview, existing);
+      if (amount <= 0) throw new Error("This change has no materials to purchase");
+      const issued = rampConfigured()
+        ? await issueMaterialsFund({ displayName: `CO-${existing.number} ${preview.name}`, amount, idempotencyKey: existing.id })
+        : { fundId: undefined as string | undefined, cardId: undefined as string | undefined, last4: String(Math.floor(1000 + Math.random() * 9000)) };
+      const source = rampConfigured() ? "ramp" : "demo";
+      return mutate(projectId, (pp) => {
+        pp.purchases ??= [];
+        const co = find(pp, a.coId);
+        if (pp.purchases.some((x) => x.changeOrderId === co.id)) return;
+        pp.purchases.push({
+          id: uid("card_"),
+          changeOrderId: co.id,
+          changeOrderNumber: co.number,
+          createdAt: now(),
+          amount,
+          last4: issued.last4,
+          merchant: source === "ramp" ? "Ramp" : "Materials desk",
+          status: "issued",
+          memo: `CO-${co.number} ${co.title}`,
+          source,
+          rampFundId: issued.fundId,
+          rampCardId: issued.cardId,
+        });
+        co.history.push({ at: now(), actor: "contractor", action: source === "ramp" ? "Issued Ramp card" : "Issued demo materials card", note: `${money(amount)} · •••• ${issued.last4}` });
+        sysMsg(pp, `${source === "ramp" ? "Ramp card" : "Demo materials card"} •••• ${issued.last4} issued for CO-${co.number} · ${money(amount)}`);
+      });
+    }
+    case "syncRamp": {
+      const preview = getProject(projectId);
+      if (!preview) throw new Error("Project not found");
+      if (!rampConfigured()) return preview;
+      const updates = new Map<string, Awaited<ReturnType<typeof fundTransactions>>>();
+      for (const card of preview.purchases ?? []) {
+        if (card.source === "ramp" && card.rampFundId) updates.set(card.id, await fundTransactions(card.rampFundId, card.rampCardId));
+      }
+      return mutate(projectId, (pp) => {
+        for (const card of pp.purchases ?? []) {
+          const txns = updates.get(card.id);
+          if (txns) card.transactions = txns;
+        }
+      });
+    }
+    case "linkTelegram":
+      return mutate(projectId, (pp) => {
+        pp.channels ??= {};
+        pp.channels.telegram ??= {};
+        if (a.role === "contractor") pp.channels.telegram.contractorChatId = a.chatId;
+        else pp.channels.telegram.clientChatId = a.chatId;
+        const who = a.role === "contractor" ? pp.contractor.name : pp.client.name;
+        sysMsg(pp, `${who} connected Telegram as the ${a.role}`);
+        pp.channels.telegram.deliveredIds = pp.messages.map((m) => m.id);
       });
     case "createManualChange":
       return mutate(projectId, (pp) => {
@@ -271,6 +346,16 @@ export async function runAction(projectId: string, a: Action): Promise<Project> 
   }
 }
 
+export async function runAction(projectId: string, a: Action): Promise<Project> {
+  const project = await applyAction(projectId, a);
+  try {
+    await notifyTelegram(projectId);
+  } catch (e) {
+    console.error("telegram notify", e);
+  }
+  return getProject(projectId) ?? project;
+}
+
 function find(p: Project, id: string) {
   const co = p.changeOrders.find((c) => c.id === id);
   if (!co) throw new Error("Change order not found");
@@ -292,6 +377,7 @@ export function createProject(input: { name: string; address: string; descriptio
     messages: [],
     changeOrders: [],
     invoices: [],
+    purchases: [],
     agentStatus: "idle",
   };
   return saveProject(p);

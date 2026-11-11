@@ -177,6 +177,7 @@ export function demoProject(): Project {
       { version: 1, createdAt: ago(60 * 24 * 6 - 40), reason: "Agreement signed", total: 0, changeOrderIds: [] },
       { version: 2, createdAt: ago(60 * 24 * 3), reason: "CO-1 approved", total: 0, changeOrderIds: [coId] },
     ],
+    purchases: [],
     agentStatus: "idle",
   };
 }

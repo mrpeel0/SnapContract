@@ -3,13 +3,14 @@ import clsx from "clsx";
 import { AnimatePresence, motion } from "framer-motion";
 import confetti from "canvas-confetti";
 import { useMemo, useState } from "react";
-import { CalendarClock, Check, ChevronDown, Minus, Pencil, Plus, Send, Sparkles, Trash2, X, PenLine, Quote, ShieldCheck, HelpCircle } from "lucide-react";
+import { CalendarClock, Check, ChevronDown, CreditCard, Minus, Pencil, Plus, Send, Sparkles, Trash2, X, PenLine, Quote, ShieldCheck, HelpCircle } from "lucide-react";
 import type { ChangeLine, ChangeOrder, Project, Role } from "@/lib/types";
-import { money, quoteChange } from "@/lib/pricing";
+import { materialsSpend, money, quoteChange } from "@/lib/pricing";
+import { ProjectCardFace } from "./Finance";
 import { AnimatedMoney, Button, StatusPill } from "./ui";
 import type { Act } from "./useProject";
 
-export function ChangeOrderCard({ project, co, role, act, compact }: { project: Project; co: ChangeOrder; role: Role; act: Act; compact?: boolean }) {
+export function ChangeOrderCard({ project, co, role, act, compact, ramp }: { project: Project; co: ChangeOrder; role: Role; act: Act; compact?: boolean; ramp?: boolean }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<ChangeLine[]>(co.lines);
   const [note, setNote] = useState(co.contractorNote ?? "");
@@ -19,9 +20,14 @@ export function ChangeOrderCard({ project, co, role, act, compact }: { project: 
   const [reason, setReason] = useState("");
   const [showDetails, setShowDetails] = useState(!compact);
   const [busy, setBusy] = useState(false);
+  const [cardError, setCardError] = useState<string | null>(null);
 
   const lines = editing ? draft : co.lines;
   const quote = useMemo(() => quoteChange(project, { lines }), [project, lines]);
+  const materials = useMemo(() => materialsSpend(project, { lines }), [project, lines]);
+  const purchase = (project.purchases ?? []).find((card) => card.changeOrderId === co.id);
+  const added = quote.lines.filter((l) => l.sign > 0).reduce((s, l) => s + l.total, 0);
+  const marginPct = added + quote.markup > 0 ? ((quote.markup / (added + quote.markup)) * 100).toFixed(1) : null;
   const hiddenFromClient = role === "client" && ["needs_info", "contractor_review"].includes(co.status);
   const sources = project.messages.filter((m) => co.sourceMessageIds.includes(m.id));
   const missingQty = lines.some((l) => !l.qty);
@@ -159,9 +165,11 @@ export function ChangeOrderCard({ project, co, role, act, compact }: { project: 
                     {editing && <AddLine project={project} onAdd={(sku) => setDraft([...draft, { id: Math.random().toString(36).slice(2), sku, qty: 1, action: "add" }])} />}
                   </div>
                   <div className="py-2 text-[12.5px] space-y-0.5">
-                    <Row label="Subtotal" value={money(quote.subtotal)} />
+                    <Row label={role === "contractor" ? "Rate-sheet cost" : "Subtotal"} value={money(quote.subtotal)} />
                     {quote.markup > 0 && <Row label={`Overhead & profit (${quote.markupPct}%)`} value={money(quote.markup)} />}
-                    <Row label="Change total" value={money(quote.total, { sign: true })} bold />
+                    <Row label={role === "contractor" ? "Client price" : "Change total"} value={money(quote.total, { sign: true })} bold />
+                    {role === "contractor" && <Row label={marginPct ? `Your margin · ${marginPct}%` : "Your margin"} value={money(quote.markup, { sign: true })} />}
+                    {role === "contractor" && materials > 0 && <Row label="Materials to buy" value={money(materials)} />}
                   </div>
                   {co.assumptions.length > 0 && (
                     <div className="pb-2 text-[12px] text-muted">
@@ -260,13 +268,31 @@ export function ChangeOrderCard({ project, co, role, act, compact }: { project: 
               </AnimatePresence>
             )}
             {co.status === "approved" && co.approval && (
-              <div className="flex items-center justify-between">
-                <div className="text-[12px] text-muted flex items-center gap-1.5">
-                  <ShieldCheck className="h-4 w-4 text-good" /> Signed by <span className="font-[cursive] italic text-ink text-[15px]">{co.approval.name}</span> · {new Date(co.approval.at).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="text-[12px] text-muted flex items-center gap-1.5">
+                    <ShieldCheck className="h-4 w-4 text-good" /> Signed by <span className="font-[cursive] italic text-ink text-[15px]">{co.approval.name}</span> · {new Date(co.approval.at).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
+                  </div>
+                  <motion.div initial={{ scale: 2, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ type: "spring", stiffness: 300, damping: 14 }} className="stamp rounded-md px-2 py-0.5 text-[11px] font-bold">
+                    APPROVED
+                  </motion.div>
                 </div>
-                <motion.div initial={{ scale: 2, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ type: "spring", stiffness: 300, damping: 14 }} className="stamp rounded-md px-2 py-0.5 text-[11px] font-bold">
-                  APPROVED
-                </motion.div>
+                {role === "contractor" && materials > 0 && (
+                  purchase ? (
+                    <ProjectCardFace last4={purchase.last4} amount={purchase.amount} memo={purchase.memo} source={purchase.source} />
+                  ) : (
+                    <div className="rounded-xl border border-dashed border-line p-3 flex flex-wrap items-center justify-between gap-2">
+                      <div className="text-[12.5px]">
+                        <div className="font-medium">Materials on this change</div>
+                        <div className="text-muted">{money(materials)} at cost, ready for a project card.</div>
+                      </div>
+                      <Button size="sm" variant="dark" disabled={busy} onClick={() => run(async () => { setCardError(null); try { await act({ type: "issueMaterialCard", coId: co.id }); } catch (e) { setCardError((e as Error).message); } })}>
+                        <CreditCard className="h-3.5 w-3.5" /> {ramp ? "Issue Ramp card" : "Purchase materials"}
+                      </Button>
+                      {cardError && <div className="w-full text-[12px] text-bad">{cardError}</div>}
+                    </div>
+                  )
+                )}
               </div>
             )}
             {co.status === "declined" && <div className="text-[12.5px] text-bad">Declined{co.declineReason ? `: “${co.declineReason}”` : ""}</div>}

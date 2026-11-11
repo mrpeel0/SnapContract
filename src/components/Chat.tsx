@@ -6,7 +6,7 @@ import { FileText, Mic, MicOff, SendHorizontal, Sparkles, Square, Wand2, X, Audi
 import type { Message, Project, Role } from "@/lib/types";
 import { Avatar, Button, timeAgo } from "./ui";
 import { ChangeOrderCard } from "./ChangeOrderCard";
-import type { Act } from "./useProject";
+import type { Act, Integrations } from "./useProject";
 
 const QUICK: Record<Role, string[]> = {
   client: [
@@ -31,7 +31,7 @@ Priya: And can we add dimmer switches for the recessed lights? Two dimmers I thi
 Marcus: Sure. Anything else?
 Priya: No, that's it. Oh, and the dog door is on hold, we'll talk later.`;
 
-export function Chat({ project, role, act, className, dense }: { project: Project; role: Role; act: Act; className?: string; dense?: boolean }) {
+export function Chat({ project, role, act, className, dense, telegram, ramp }: { project: Project; role: Role; act: Act; className?: string; dense?: boolean; telegram?: Integrations["telegram"]; ramp?: boolean }) {
   const [text, setText] = useState("");
   const [showTranscript, setShowTranscript] = useState(false);
   const [transcript, setTranscript] = useState("");
@@ -39,6 +39,7 @@ export function Chat({ project, role, act, className, dense }: { project: Projec
   const voice = useVoice((t) => setText(t));
   const [sending, setSending] = useState(false);
   const [voiceMode, setVoiceMode] = useState(false);
+  const [appComposer, setAppComposer] = useState(false);
 
   const visible = useMemo(() => project.messages.filter((m) => !m.visibleTo || m.visibleTo.includes(role)), [project.messages, role]);
 
@@ -84,7 +85,7 @@ export function Chat({ project, role, act, className, dense }: { project: Projec
         )}
         <AnimatePresence initial={false}>
           {visible.map((m) => (
-            <MessageRow key={m.id} m={m} project={project} role={role} act={act} showCard={m.changeOrderId ? lastRef.get(m.changeOrderId) === m.id : false} dense={dense} />
+            <MessageRow key={m.id} m={m} project={project} role={role} act={act} showCard={m.changeOrderId ? lastRef.get(m.changeOrderId) === m.id : false} dense={dense} ramp={ramp} />
           ))}
         </AnimatePresence>
         {thinking && (
@@ -100,6 +101,16 @@ export function Chat({ project, role, act, className, dense }: { project: Projec
 
       {/* composer */}
       <div className={clsx("border-t border-line bg-white", dense ? "p-2.5" : "p-3.5")}>
+        {telegram?.enabled && !appComposer ? (
+          <TelegramBar telegram={telegram} role={role} onTypeHere={() => setAppComposer(true)} />
+        ) : (
+          <>
+        {telegram?.enabled && (
+          <button onClick={() => setAppComposer(false)} className="mb-2 text-[12px] font-medium text-[#1577a8] cursor-pointer">Back to Telegram</button>
+        )}
+        {!telegram?.enabled && (
+          <div className="mb-2 text-[12px] text-muted">This thread can run in Telegram. Add <span className="font-mono">TELEGRAM_BOT_TOKEN</span> and restart the server.</div>
+        )}
         <div className="flex gap-1.5 overflow-x-auto scroll-thin pb-2 -mx-0.5 px-0.5">
           {QUICK[role].map((q) => (
             <button key={q} onClick={() => setText(q)} className="shrink-0 rounded-full border border-line bg-bg/60 px-3 py-1 text-[12px] text-ink/80 hover:border-accent/50 hover:text-accent transition-colors cursor-pointer">
@@ -156,6 +167,8 @@ export function Chat({ project, role, act, className, dense }: { project: Projec
           </Button>
         </div>
         {voiceMode && !voice.listening && text && <div className="text-[11px] text-muted mt-1 pl-1">🎙 Will send as a transcribed voice note</div>}
+          </>
+        )}
       </div>
 
       <AnimatePresence>
@@ -194,7 +207,29 @@ export function Chat({ project, role, act, className, dense }: { project: Projec
   );
 }
 
-function MessageRow({ m, project, role, act, showCard, dense }: { m: Message; project: Project; role: Role; act: Act; showCard: boolean; dense?: boolean }) {
+function TelegramBar({ telegram, role, onTypeHere }: { telegram: Integrations["telegram"]; role: Role; onTypeHere: () => void }) {
+  const link = role === "contractor" ? telegram.links?.contractor : telegram.links?.client;
+  const linked = role === "contractor" ? telegram.contractorLinked : telegram.clientLinked;
+  const otherLinked = role === "contractor" ? telegram.clientLinked : telegram.contractorLinked;
+  return (
+    <div className="rounded-2xl border border-[#229ED9]/30 bg-[#229ED9]/5 px-3 py-2.5">
+      <div className="text-[13px] font-semibold text-[#1577a8]">This conversation runs in Telegram</div>
+      <div className="mt-1 text-[12.5px] text-muted">
+        {linked ? "This side is linked." : "Open the bot and tap Start."} The other side is {otherLinked ? "linked" : "not linked yet"}. Text the bot and the agent prices change orders there. Approve and send with the buttons it replies with.
+      </div>
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        {link && (
+          <a href={link} target="_blank" rel="noreferrer" className="inline-flex items-center h-8 px-3 rounded-xl bg-[#229ED9] text-white text-[13px] font-medium">
+            Open @{telegram.username}
+          </a>
+        )}
+        <button onClick={onTypeHere} className="text-[12px] text-muted hover:text-ink cursor-pointer">Type here instead</button>
+      </div>
+    </div>
+  );
+}
+
+function MessageRow({ m, project, role, act, showCard, dense, ramp }: { m: Message; project: Project; role: Role; act: Act; showCard: boolean; dense?: boolean; ramp?: boolean }) {
   if (m.author === "system") {
     return (
       <motion.div layout initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex justify-center">
@@ -216,7 +251,7 @@ function MessageRow({ m, project, role, act, showCard, dense }: { m: Message; pr
               {co.status === "needs_info" && co.question && (
                 <div className="mb-2 rounded-2xl rounded-tl-md bg-white border border-line px-3.5 py-2 text-sm">{co.question}</div>
               )}
-              <ChangeOrderCard project={project} co={co} role={role} act={act} compact={dense} />
+              <ChangeOrderCard project={project} co={co} role={role} act={act} compact={dense} ramp={ramp} />
             </>
           ) : co ? (
             <div className="text-[12px] text-muted rounded-full border border-line bg-white px-3 py-1 inline-flex items-center gap-1.5">

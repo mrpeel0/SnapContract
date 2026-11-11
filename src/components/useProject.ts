@@ -3,9 +3,21 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { Project } from "@/lib/types";
 import type { Action } from "@/lib/actions";
 
+export interface Integrations {
+  telegram: {
+    enabled: boolean;
+    username: string | null;
+    links: { contractor: string; client: string } | null;
+    contractorLinked: boolean;
+    clientLinked: boolean;
+  };
+  ramp: { enabled: boolean; sandbox: boolean };
+}
+
 export function useProject(id: string) {
   const [project, setProject] = useState<Project | null>(null);
   const [ai, setAi] = useState<"claude" | "local" | null>(null);
+  const [integrations, setIntegrations] = useState<Integrations | null>(null);
   const [error, setError] = useState<string | null>(null);
   const busy = useRef(false);
 
@@ -17,6 +29,7 @@ export function useProject(id: string) {
       if (!r.ok) throw new Error(j.error);
       setProject(j.project);
       setAi(j.ai);
+      if (j.integrations) setIntegrations(j.integrations);
     } catch (e) {
       setError((e as Error).message);
     }
@@ -37,6 +50,7 @@ export function useProject(id: string) {
         const j = await r.json();
         if (!r.ok) throw new Error(j.error);
         setProject(j.project);
+        if (j.integrations) setIntegrations(j.integrations);
         return j.project as Project;
       } finally {
         busy.current = false;
@@ -45,7 +59,7 @@ export function useProject(id: string) {
     [id],
   );
 
-  return { project, ai, error, act, refresh };
+  return { project, ai, integrations, error, act, refresh };
 }
 
 export type Act = ReturnType<typeof useProject>["act"];

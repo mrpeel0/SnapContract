@@ -3,7 +3,8 @@ import clsx from "clsx";
 import { motion } from "framer-motion";
 import { CalendarClock, CircleDollarSign, FileCheck2, Hourglass, TrendingUp } from "lucide-react";
 import type { Project, Role } from "@/lib/types";
-import { budget, money, quoteChange } from "@/lib/pricing";
+import { budget, money, paymentImpact, quoteChange } from "@/lib/pricing";
+import { CashFlowTimeline } from "./Finance";
 import { AnimatedMoney, Card, StatusPill, timeAgo } from "./ui";
 
 export function BudgetPanel({ project, role, onOpen }: { project: Project; role: Role; onOpen?: (tab: string) => void }) {
@@ -13,7 +14,14 @@ export function BudgetPanel({ project, role, onOpen }: { project: Project; role:
   const live = project.changeOrders.filter((c) => ["needs_info", "contractor_review", "client_review"].includes(c.status));
   const myTurn = live.filter((c) => (role === "contractor" ? c.status !== "client_review" : c.status === "client_review"));
   const weeks = project.agreement.timelineWeeks;
-  const nextPayment = project.agreement.payments[1];
+  const prior = project.invoices.length >= 2 ? project.invoices[project.invoices.length - 2].total : b.current;
+  const flow = paymentImpact(project.agreement.payments, b.current, prior, project.agreement.status === "signed", project.invoices[0]?.total);
+  const latestCo = [...project.changeOrders].filter((c) => c.status === "approved" && c.approval).sort((a, c) => (c.approval!.at > a.approval!.at ? 1 : -1))[0];
+  const drawLine =
+    project.invoices.length >= 2 && flow.next && flow.next.delta !== 0 && latestCo
+      ? `CO-${latestCo.number} adds ${money(flow.next.delta, { sign: true })} to the next draw`
+      : null;
+  const variancePct = b.baseline ? (b.approved / b.baseline) * 100 : 0;
 
   return (
     <div className="space-y-4">
@@ -56,11 +64,14 @@ export function BudgetPanel({ project, role, onOpen }: { project: Project; role:
           <div className="text-[11.5px] text-muted">from approved changes</div>
         </Card>
         <Card className="p-3.5">
-          <div className="text-[11px] uppercase tracking-wider text-muted font-semibold flex items-center gap-1"><TrendingUp className="h-3 w-3" /> Change vs. original</div>
-          <div className={clsx("mt-1 font-semibold text-lg", b.approved > 0 ? "text-accent" : "text-good")}>
-            {b.baseline ? `${b.approved >= 0 ? "+" : ""}${((b.approved / b.baseline) * 100).toFixed(1)}%` : "—"}
+          <div className="text-[11px] uppercase tracking-wider text-muted font-semibold flex items-center gap-1"><TrendingUp className="h-3 w-3" /> Variance</div>
+          <div className={clsx("mt-1 font-semibold text-lg", b.approved > 0 ? "text-accent" : b.approved < 0 ? "text-good" : "")}>
+            {money(b.approved, { sign: true, cents: false })}
           </div>
-          <div className="text-[11.5px] text-muted">{project.invoices.length ? `Invoice v${project.invoices.length}` : "No invoice yet"}</div>
+          <div className="text-[11.5px] text-muted">
+            {b.baseline ? `${variancePct >= 0 ? "+" : ""}${variancePct.toFixed(1)}% vs original` : "No baseline yet"}
+            {b.pending !== 0 && <span> · {money(b.pending, { sign: true, cents: false })} open</span>}
+          </div>
         </Card>
       </div>
 
@@ -91,20 +102,18 @@ export function BudgetPanel({ project, role, onOpen }: { project: Project; role:
         )}
       </Card>
 
-      {nextPayment && b.current > 0 && (
+      {project.agreement.payments.length > 0 && b.current > 0 && (
         <Card className="p-4">
           <div className="text-[11.5px] uppercase tracking-wider text-muted font-semibold flex items-center gap-1.5 mb-2">
-            <FileCheck2 className="h-3.5 w-3.5" /> Payment schedule
+            <FileCheck2 className="h-3.5 w-3.5" /> Cash flow
+            {onOpen && (
+              <button onClick={() => onOpen("invoice")} className="ml-auto normal-case tracking-normal text-agent cursor-pointer">
+                Invoice
+              </button>
+            )}
           </div>
-          <div className="space-y-1.5">
-            {project.agreement.payments.map((p, i) => (
-              <div key={p.label} className="flex items-center gap-2 text-[12.5px]">
-                <span className={clsx("h-2 w-2 rounded-full", i === 0 ? "bg-good" : "bg-black/15")} />
-                <span className="flex-1">{p.label} <span className="text-muted">· {p.pct}%</span></span>
-                <AnimatedMoney value={(b.current * p.pct) / 100} className="font-medium" />
-              </div>
-            ))}
-          </div>
+          {drawLine && <div className="mb-2 text-[12.5px] font-medium text-accent">{drawLine}</div>}
+          <CashFlowTimeline payments={project.agreement.payments} contract={b.current} prior={prior} depositCollected={project.agreement.status === "signed"} collectedContract={project.invoices[0]?.total} />
         </Card>
       )}
     </div>

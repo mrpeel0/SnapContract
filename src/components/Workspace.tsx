@@ -25,7 +25,7 @@ const TABS = [
 ];
 
 export function Workspace({ id }: { id: string }) {
-  const { project, ai, act, error } = useProject(id);
+  const { project, ai, integrations, act, error } = useProject(id);
   const params = useSearchParams();
   const router = useRouter();
   const [tab, setTab] = useState(params.get("tab") ?? "chat");
@@ -68,6 +68,12 @@ export function Workspace({ id }: { id: string }) {
               <span className="text-muted">Contract</span>
               <AnimatedMoney value={b.current} cents={false} className="font-semibold" />
             </div>
+            <span className={clsx("hidden lg:inline-flex items-center gap-1 text-[11.5px] font-semibold rounded-full px-2.5 py-1", integrations?.telegram.enabled ? "bg-[#229ED9]/10 text-[#1577a8]" : "bg-black/5 text-muted")} title={integrations?.telegram.enabled ? "Conversation is delivered through the Telegram bot" : "Set TELEGRAM_BOT_TOKEN to run this chat in Telegram"}>
+              Telegram {integrations?.telegram.enabled ? "on" : "off"}
+            </span>
+            <span className={clsx("hidden lg:inline-flex items-center gap-1 text-[11.5px] font-semibold rounded-full px-2.5 py-1", integrations?.ramp.enabled ? "bg-good/12 text-[#067a55]" : "bg-black/5 text-muted")} title={integrations?.ramp.enabled ? (integrations.ramp.sandbox ? "Ramp sandbox" : "Ramp production") : "Set RAMP_CLIENT_ID and RAMP_CLIENT_SECRET to issue real cards"}>
+              Ramp {integrations?.ramp.enabled ? (integrations.ramp.sandbox ? "sandbox" : "live") : "off"}
+            </span>
             <span
               title={ai === "claude" ? "Using Claude for change detection and drafting" : ai === "local" ? "Using a local model through Ollama" : "No ANTHROPIC_API_KEY or LOCAL_MODEL set: using the built-in offline engine"}
               className={clsx("hidden md:inline-flex items-center gap-1 text-[11.5px] font-semibold rounded-full px-2.5 py-1", ai ? "bg-agent/10 text-agent" : "bg-black/5 text-muted")}
@@ -139,7 +145,7 @@ export function Workspace({ id }: { id: string }) {
                   <span className="font-semibold">{party.name}</span>
                   <span className="opacity-70 capitalize">· {r}&apos;s phone</span>
                 </div>
-                <Chat project={project} role={r} act={act} className="flex-1" dense />
+                <Chat project={project} role={r} act={act} className="flex-1" dense telegram={integrations?.telegram} ramp={integrations?.ramp.enabled} />
               </div>
             );
           })}
@@ -151,7 +157,7 @@ export function Workspace({ id }: { id: string }) {
         <main className="flex-1 min-h-0 overflow-y-auto scroll-thin">
           {tab === "chat" && (
             <div className="h-full grid lg:grid-cols-[1fr_360px] gap-0">
-              <Chat project={project} role={role} act={act} className="min-h-0 border-r border-line" />
+              <Chat project={project} role={role} act={act} className="min-h-0 border-r border-line" telegram={integrations?.telegram} ramp={integrations?.ramp.enabled} />
               <div className="hidden lg:block overflow-y-auto scroll-thin p-5">
                 <BudgetPanel project={project} role={role} onOpen={setTab} />
               </div>
@@ -159,8 +165,8 @@ export function Workspace({ id }: { id: string }) {
           )}
           <div className="px-5">
             {tab === "agreement" && <AgreementView project={project} role={role} act={act} />}
-            {tab === "changes" && <ChangeOrdersBoard project={project} role={role} act={act} />}
-            {tab === "invoice" && <InvoiceView project={project} />}
+            {tab === "changes" && <ChangeOrdersBoard project={project} role={role} act={act} ramp={integrations?.ramp.enabled} />}
+            {tab === "invoice" && <InvoiceView project={project} role={role} act={act} ramp={integrations?.ramp.enabled} />}
             {tab === "rates" && <RateSheet project={project} role={role} act={act} />}
           </div>
         </main>

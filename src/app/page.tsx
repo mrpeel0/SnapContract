@@ -12,7 +12,7 @@ interface Row {
   address: string;
   client: string;
   status: string;
-  budget: { current: number; pending: number; approvedCount: number };
+  budget: { baseline: number; current: number; pending: number; approved: number; projected: number; approvedCount: number };
   needsAttention: number;
   lastMessage: string;
 }
@@ -23,6 +23,16 @@ const STEPS = [
   { icon: Check, t: "Client approves", d: "Signed right in the conversation" },
   { icon: ReceiptText, t: "Invoice updates", d: "New version, approval attached" },
 ];
+
+function PortfolioStat({ label, value, hint, accent }: { label: string; value: number; hint: string; accent?: boolean }) {
+  return (
+    <Card className="p-4">
+      <div className="text-[11px] uppercase tracking-wider text-muted font-semibold">{label}</div>
+      <div className={`mt-1 text-2xl font-semibold tabular-nums ${accent && value !== 0 ? "text-accent" : ""}`}>{money(value, { cents: false })}</div>
+      <div className="text-[12px] text-muted mt-0.5">{hint}</div>
+    </Card>
+  );
+}
 
 export default function Home() {
   const [rows, setRows] = useState<Row[]>([]);
@@ -101,8 +111,15 @@ export default function Home() {
       </section>
 
       <section className="max-w-6xl mx-auto px-6 -mt-10 pb-20 relative">
+        {rows.length > 0 && (
+          <div className="grid sm:grid-cols-3 gap-3 mb-4 md:mt-14">
+            <PortfolioStat label="Contracted value" value={rows.reduce((s, p) => s + p.budget.current, 0)} hint="Signed baseline plus approved changes" />
+            <PortfolioStat label="Open change exposure" value={rows.reduce((s, p) => s + p.budget.pending, 0)} hint="Pending, not yet on an invoice" accent />
+            <PortfolioStat label="Approved changes" value={rows.reduce((s, p) => s + p.budget.approved, 0)} hint={`${rows.reduce((s, p) => s + p.budget.approvedCount, 0)} signed change orders`} />
+          </div>
+        )}
         <div className="flex items-end justify-between mb-4">
-          <h2 className="text-xl font-semibold tracking-tight text-white drop-shadow md:text-ink md:drop-shadow-none md:mt-14">Projects</h2>
+          <h2 className="text-xl font-semibold tracking-tight text-ink">Projects</h2>
           <Link href="/projects/new">
             <Button size="sm" variant="dark"><Plus className="h-3.5 w-3.5" /> New project</Button>
           </Link>
@@ -125,7 +142,10 @@ export default function Home() {
                       <div className="text-[11px] text-muted">Contract value</div>
                       <div className="text-xl font-semibold tabular-nums">{money(p.budget.current, { cents: false })}</div>
                     </div>
-                    <div className="text-[11.5px] text-muted">{timeAgo(p.lastMessage)}</div>
+                    <div className="text-right">
+                      {p.budget.pending !== 0 && <div className="text-[11.5px] font-semibold text-accent tabular-nums">{money(p.budget.pending, { sign: true, cents: false })} open</div>}
+                      <div className="text-[11.5px] text-muted">{timeAgo(p.lastMessage)}</div>
+                    </div>
                   </div>
                 </Card>
               </Link>

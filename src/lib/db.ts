@@ -44,12 +44,20 @@ function persist() {
   }
 }
 
+function normalize(p: Project): Project {
+  p.purchases ??= [];
+  return p;
+}
+
 export function listProjects(): Project[] {
-  return Object.values(load().projects).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  return Object.values(load().projects)
+    .map(normalize)
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
 export function getProject(id: string): Project | undefined {
-  return load().projects[id];
+  const p = load().projects[id];
+  return p ? normalize(p) : undefined;
 }
 
 export function saveProject(p: Project) {

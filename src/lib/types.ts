@@ -106,6 +106,37 @@ export interface InvoiceVersion {
   changeOrderIds: string[];
 }
 
+export interface RampTransaction {
+  id: string;
+  amount: number;
+  merchant: string;
+  at: string;
+  state: string;
+}
+
+/** Materials spend. A Ramp fund when credentials are set, otherwise a local demo card. */
+export interface MaterialPurchase {
+  id: string;
+  changeOrderId: string;
+  changeOrderNumber: number;
+  createdAt: string;
+  amount: number;
+  last4: string;
+  merchant: string;
+  status: "issued";
+  memo: string;
+  source?: "ramp" | "demo";
+  rampFundId?: string;
+  rampCardId?: string;
+  transactions?: RampTransaction[];
+}
+
+export interface TelegramChannel {
+  contractorChatId?: number;
+  clientChatId?: number;
+  deliveredIds?: string[];
+}
+
 export interface Party {
   name: string;
   company?: string;
@@ -125,6 +156,8 @@ export interface Project {
   messages: Message[];
   changeOrders: ChangeOrder[];
   invoices: InvoiceVersion[];
+  purchases: MaterialPurchase[];
+  channels?: { telegram?: TelegramChannel };
   agentStatus: "idle" | "thinking";
   agentStatusText?: string;
   aiMode?: "live" | "offline";
