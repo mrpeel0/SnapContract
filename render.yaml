@@ -1,0 +1,31 @@
+# Render blueprint: New → Blueprint → pick this repo. Render asks for each `sync: false` value.
+services:
+  - type: web
+    name: snapcontract
+    runtime: node
+    plan: free
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    healthCheckPath: /
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      # AI engine (OpenAI is used first when set)
+      - key: OPENAI_API_KEY
+        sync: false
+      # Messaging apps (leave blank to skip one)
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: WHATSAPP_TOKEN
+        sync: false
+      - key: WHATSAPP_PHONE_NUMBER_ID
+        sync: false
+      - key: WHATSAPP_VERIFY_TOKEN
+        sync: false
+      # Ramp sandbox cards
+      - key: RAMP_CLIENT_ID
+        sync: false
+      - key: RAMP_CLIENT_SECRET
+        sync: false
+      - key: RAMP_ENV
+        value: sandbox
