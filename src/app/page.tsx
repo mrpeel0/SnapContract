@@ -67,11 +67,29 @@ export default function Home() {
                 <span className="bg-gradient-to-r from-accent via-accent-2 to-agent-2 bg-clip-text text-transparent">priced, approved, invoiced.</span>
               </motion.h1>
               <motion.p initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="mt-5 text-white/70 text-lg max-w-xl">
-                SnapContract&apos;s agent lives in the contractor-client conversation. It catches scope changes in texts, voice notes and call transcripts, prices them from your rate sheet and gets them signed before work starts.
+                The agent sits in the contractor–client thread, on the website and in Telegram, WhatsApp, and iMessage. It prices scope changes from the rate sheet and gets them signed before the budget moves.
               </motion.p>
-              <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="mt-8 flex flex-wrap gap-3">
-                <Link href="/projects/maple-kitchen?tab=chat&as=client">
+              <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="mt-6 flex flex-wrap gap-2">
+                {[
+                  ["Website", "bg-white"],
+                  ["Telegram", "bg-[#229ED9]"],
+                  ["WhatsApp", "bg-[#25D366]"],
+                  ["iMessage", "bg-[#0A84FF]"],
+                ].map(([name, dot]) => (
+                  <span key={name} className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-[12.5px] font-medium text-white/85">
+                    <span className={`h-1.5 w-1.5 rounded-full ${dot}`} />
+                    {name}
+                  </span>
+                ))}
+              </motion.div>
+              <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="mt-6 flex flex-wrap gap-3">
+                <Link href="/projects/maple-kitchen?tab=chat&as=client&split=1">
                   <Button size="lg">Open live demo <ArrowRight className="h-4 w-4" /></Button>
+                </Link>
+                <Link href="/projects/maple-kitchen?tab=chat&as=client&channel=whatsapp">
+                  <Button size="lg" variant="outline" className="!bg-white/10 !border-white/20 text-white hover:!bg-white/15">
+                    Preview on a phone
+                  </Button>
                 </Link>
                 <Link href="/projects/new">
                   <Button size="lg" variant="outline" className="!bg-white/10 !border-white/20 text-white hover:!bg-white/15">

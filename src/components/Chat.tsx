@@ -6,7 +6,8 @@ import { FileText, Mic, MicOff, SendHorizontal, Sparkles, Square, Wand2, X, Audi
 import type { Message, Project, Role } from "@/lib/types";
 import { Avatar, Button, timeAgo } from "./ui";
 import { ChangeOrderCard } from "./ChangeOrderCard";
-import type { Act, Integrations } from "./useProject";
+import type { Act } from "./useProject";
+import type { Surface } from "./Channels";
 
 const QUICK: Record<Role, string[]> = {
   client: [
@@ -31,7 +32,7 @@ Priya: And can we add dimmer switches for the recessed lights? Two dimmers I thi
 Marcus: Sure. Anything else?
 Priya: No, that's it. Oh, and the dog door is on hold, we'll talk later.`;
 
-export function Chat({ project, role, act, className, dense, telegram, ramp }: { project: Project; role: Role; act: Act; className?: string; dense?: boolean; telegram?: Integrations["telegram"]; ramp?: boolean }) {
+export function Chat({ project, role, act, className, dense, ramp, skin = "web" }: { project: Project; role: Role; act: Act; className?: string; dense?: boolean; ramp?: boolean; skin?: Surface }) {
   const [text, setText] = useState("");
   const [showTranscript, setShowTranscript] = useState(false);
   const [transcript, setTranscript] = useState("");
@@ -39,7 +40,7 @@ export function Chat({ project, role, act, className, dense, telegram, ramp }: {
   const voice = useVoice((t) => setText(t));
   const [sending, setSending] = useState(false);
   const [voiceMode, setVoiceMode] = useState(false);
-  const [appComposer, setAppComposer] = useState(false);
+  const phone = skin !== "web";
 
   const visible = useMemo(() => project.messages.filter((m) => !m.visibleTo || m.visibleTo.includes(role)), [project.messages, role]);
 
@@ -76,8 +77,14 @@ export function Chat({ project, role, act, className, dense, telegram, ramp }: {
   const locked = project.agreement.status !== "signed";
 
   return (
-    <div className={clsx("flex flex-col min-h-0 bg-white/60", className)}>
-      <div ref={scroller} className={clsx("flex-1 overflow-y-auto scroll-thin space-y-3", dense ? "p-3" : "p-5")}>
+    <div className={clsx("flex flex-col min-h-0", skin === "web" && "bg-white/70", className)}>
+      {skin === "web" && (
+        <div className="shrink-0 border-b border-line bg-white/90 px-5 py-3">
+          <div className="text-[13px] font-semibold tracking-tight">Project thread</div>
+          <div className="text-[11.5px] text-muted">Website · the same conversation is on Telegram, WhatsApp, and iMessage</div>
+        </div>
+      )}
+      <div ref={scroller} className={clsx("flex-1 overflow-y-auto scroll-thin space-y-3", dense || phone ? "p-3" : "p-5", skin === "whatsapp" && "wa-wall", skin === "telegram" && "tg-wall", skin === "imessage" && "bg-white")}>
         {locked && (
           <div className="mx-auto max-w-md text-center text-[13px] text-muted rounded-xl border border-dashed border-line p-4 bg-white">
             The agent starts watching for changes once the agreement is signed by both sides.
@@ -85,7 +92,7 @@ export function Chat({ project, role, act, className, dense, telegram, ramp }: {
         )}
         <AnimatePresence initial={false}>
           {visible.map((m) => (
-            <MessageRow key={m.id} m={m} project={project} role={role} act={act} showCard={m.changeOrderId ? lastRef.get(m.changeOrderId) === m.id : false} dense={dense} ramp={ramp} />
+            <MessageRow key={m.id} m={m} project={project} role={role} act={act} showCard={m.changeOrderId ? lastRef.get(m.changeOrderId) === m.id : false} dense={dense || phone} ramp={ramp} skin={skin} />
           ))}
         </AnimatePresence>
         {thinking && (
@@ -100,17 +107,7 @@ export function Chat({ project, role, act, className, dense, telegram, ramp }: {
       </div>
 
       {/* composer */}
-      <div className={clsx("border-t border-line bg-white", dense ? "p-2.5" : "p-3.5")}>
-        {telegram?.enabled && !appComposer ? (
-          <TelegramBar telegram={telegram} role={role} onTypeHere={() => setAppComposer(true)} />
-        ) : (
-          <>
-        {telegram?.enabled && (
-          <button onClick={() => setAppComposer(false)} className="mb-2 text-[12px] font-medium text-[#1577a8] cursor-pointer">Back to Telegram</button>
-        )}
-        {!telegram?.enabled && (
-          <div className="mb-2 text-[12px] text-muted">This thread can run in Telegram. Add <span className="font-mono">TELEGRAM_BOT_TOKEN</span> and restart the server.</div>
-        )}
+      <div className={clsx("border-t", phone ? "px-2 py-2" : dense ? "p-2.5" : "p-3.5", skin === "whatsapp" && "border-transparent bg-[#f0f2f5]", skin === "telegram" && "border-white/40 bg-white/80", skin === "imessage" && "border-black/5 bg-[#f6f6f6]", skin === "web" && "border-line bg-white")}>
         <div className="flex gap-1.5 overflow-x-auto scroll-thin pb-2 -mx-0.5 px-0.5">
           {QUICK[role].map((q) => (
             <button key={q} onClick={() => setText(q)} className="shrink-0 rounded-full border border-line bg-bg/60 px-3 py-1 text-[12px] text-ink/80 hover:border-accent/50 hover:text-accent transition-colors cursor-pointer">
@@ -118,8 +115,8 @@ export function Chat({ project, role, act, className, dense, telegram, ramp }: {
             </button>
           ))}
         </div>
-        <div className={clsx("flex items-end gap-2 rounded-2xl border bg-white px-2 py-1.5 transition-colors", voice.listening ? "border-bad/50 ring-4 ring-bad/10" : "border-line focus-within:border-ink/30")}>
-          <Avatar name={me.name} tone={role === "contractor" ? "ink" : "accent"} size={28} />
+        <div className={clsx("flex items-end gap-2 px-2 py-1.5 transition-colors", skin === "imessage" ? "rounded-full" : "rounded-2xl", skin === "web" || skin === "telegram" ? "border bg-white" : "bg-white", voice.listening ? "border-bad/50 ring-4 ring-bad/10" : "border-line focus-within:border-ink/30")}>
+          {!phone && <Avatar name={me.name} tone={role === "contractor" ? "ink" : "accent"} size={28} />}
           {voice.listening ? (
             <div className="flex-1 py-1.5 text-sm flex items-center gap-2 min-h-9">
               <AudioLines className="h-4 w-4 text-bad animate-pulse" />
@@ -162,13 +159,22 @@ export function Chat({ project, role, act, className, dense, telegram, ramp }: {
           <button title="Share a call transcript" onClick={() => setShowTranscript(true)} className="h-9 w-9 grid place-items-center rounded-xl hover:bg-black/5 text-muted cursor-pointer">
             <FileText className="h-4 w-4" />
           </button>
-          <Button size="sm" className="h-9 w-9 !px-0" disabled={!text.trim() || sending} onClick={() => send(text, voiceMode ? "voice" : "text")}>
+          <button
+            type="button"
+            disabled={!text.trim() || sending}
+            onClick={() => send(text, voiceMode ? "voice" : "text")}
+            className={clsx(
+              "h-9 w-9 grid place-items-center rounded-full text-white disabled:opacity-40 cursor-pointer",
+              skin === "whatsapp" && "bg-[#25D366]",
+              skin === "telegram" && "bg-[#229ED9]",
+              skin === "imessage" && "bg-[#0A84FF]",
+              skin === "web" && "bg-ink",
+            )}
+          >
             <SendHorizontal className="h-4 w-4" />
-          </Button>
+          </button>
         </div>
-        {voiceMode && !voice.listening && text && <div className="text-[11px] text-muted mt-1 pl-1">🎙 Will send as a transcribed voice note</div>}
-          </>
-        )}
+        {voiceMode && !voice.listening && text && <div className="text-[11px] text-muted mt-1 pl-1">Will send as a transcribed voice note</div>}
       </div>
 
       <AnimatePresence>
@@ -207,33 +213,11 @@ export function Chat({ project, role, act, className, dense, telegram, ramp }: {
   );
 }
 
-function TelegramBar({ telegram, role, onTypeHere }: { telegram: Integrations["telegram"]; role: Role; onTypeHere: () => void }) {
-  const link = role === "contractor" ? telegram.links?.contractor : telegram.links?.client;
-  const linked = role === "contractor" ? telegram.contractorLinked : telegram.clientLinked;
-  const otherLinked = role === "contractor" ? telegram.clientLinked : telegram.contractorLinked;
-  return (
-    <div className="rounded-2xl border border-[#229ED9]/30 bg-[#229ED9]/5 px-3 py-2.5">
-      <div className="text-[13px] font-semibold text-[#1577a8]">This conversation runs in Telegram</div>
-      <div className="mt-1 text-[12.5px] text-muted">
-        {linked ? "This side is linked." : "Open the bot and tap Start."} The other side is {otherLinked ? "linked" : "not linked yet"}. Text the bot and the agent prices change orders there. Approve and send with the buttons it replies with.
-      </div>
-      <div className="mt-2 flex flex-wrap items-center gap-2">
-        {link && (
-          <a href={link} target="_blank" rel="noreferrer" className="inline-flex items-center h-8 px-3 rounded-xl bg-[#229ED9] text-white text-[13px] font-medium">
-            Open @{telegram.username}
-          </a>
-        )}
-        <button onClick={onTypeHere} className="text-[12px] text-muted hover:text-ink cursor-pointer">Type here instead</button>
-      </div>
-    </div>
-  );
-}
-
-function MessageRow({ m, project, role, act, showCard, dense, ramp }: { m: Message; project: Project; role: Role; act: Act; showCard: boolean; dense?: boolean; ramp?: boolean }) {
+function MessageRow({ m, project, role, act, showCard, dense, ramp, skin }: { m: Message; project: Project; role: Role; act: Act; showCard: boolean; dense?: boolean; ramp?: boolean; skin: Surface }) {
   if (m.author === "system") {
     return (
       <motion.div layout initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex justify-center">
-        <div className="text-[11.5px] text-muted bg-black/[0.04] rounded-full px-3 py-1">{m.body}</div>
+        <div className={clsx("text-[11.5px] rounded-full px-3 py-1 text-center max-w-[90%]", skin === "telegram" ? "bg-black/25 text-white" : skin === "imessage" ? "bg-transparent text-black/40" : "text-muted bg-black/[0.05]")}>{m.body}</div>
       </motion.div>
     );
   }
@@ -241,10 +225,10 @@ function MessageRow({ m, project, role, act, showCard, dense, ramp }: { m: Messa
     const co = m.changeOrderId ? project.changeOrders.find((c) => c.id === m.changeOrderId) : undefined;
     return (
       <motion.div layout initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="flex gap-2.5 items-start">
-        <Avatar name="AI" tone="agent" size={28} />
+        {skin === "web" && <Avatar name="AI" tone="agent" size={28} />}
         <div className="flex-1 min-w-0 max-w-[560px]">
-          <div className="text-[11px] text-muted mb-1 flex items-center gap-1.5">
-            <span className="font-semibold text-agent">SnapContract Agent</span> · {timeAgo(m.createdAt)}
+          <div className={clsx("text-[11px] mb-1 flex items-center gap-1.5", skin === "telegram" ? "text-white/80" : "text-muted")}>
+            <span className={clsx("font-semibold", skin === "telegram" ? "text-white" : "text-agent")}>SnapContract</span> · {timeAgo(m.createdAt)}
           </div>
           {co && showCard ? (
             <>
@@ -266,11 +250,27 @@ function MessageRow({ m, project, role, act, showCard, dense, ramp }: { m: Messa
   }
   const mine = m.author === role;
   const party = m.author === "contractor" ? project.contractor : project.client;
+  const bubble = mine
+    ? skin === "whatsapp"
+      ? "bg-[#d9fdd3] text-[#111b21] rounded-lg rounded-br-sm"
+      : skin === "telegram"
+        ? "bg-[#eeffde] text-[#18222d] rounded-xl rounded-br-sm shadow-sm"
+        : skin === "imessage"
+          ? "bg-[#0A84FF] text-white rounded-[18px] rounded-br-[5px]"
+          : "bg-ink text-white rounded-2xl rounded-br-md"
+    : skin === "whatsapp"
+      ? "bg-white text-[#111b21] rounded-lg rounded-bl-sm shadow-sm"
+      : skin === "telegram"
+        ? "bg-white text-[#18222d] rounded-xl rounded-bl-sm shadow-sm"
+        : skin === "imessage"
+          ? "bg-[#E9E9EB] text-black rounded-[18px] rounded-bl-[5px]"
+          : "bg-white border border-line rounded-2xl rounded-bl-md";
+  const quiet = mine && (skin === "web" || skin === "imessage") ? "text-white/60" : "text-muted";
   return (
     <motion.div layout initial={{ opacity: 0, y: 10, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} className={clsx("flex gap-2.5 items-end", mine && "flex-row-reverse")}>
-      <Avatar name={party.name} tone={m.author === "contractor" ? "ink" : "accent"} size={28} />
-      <div className={clsx("max-w-[78%] flex flex-col", mine ? "items-end" : "items-start")}>
-        <div className="text-[11px] text-muted mb-1 px-1">
+      {skin === "web" && <Avatar name={party.name} tone={m.author === "contractor" ? "ink" : "accent"} size={28} />}
+      <div className={clsx("max-w-[82%] flex flex-col", mine ? "items-end" : "items-start")}>
+        <div className={clsx("text-[11px] mb-1 px-1", skin === "telegram" ? "text-white/75" : "text-muted")}>
           {party.name.split(" ")[0]} · {timeAgo(m.createdAt)}
         </div>
         {m.kind === "transcript" ? (
@@ -279,14 +279,9 @@ function MessageRow({ m, project, role, act, showCard, dense, ramp }: { m: Messa
             {m.body}
           </div>
         ) : (
-          <div
-            className={clsx(
-              "rounded-2xl px-3.5 py-2 text-sm leading-relaxed",
-              mine ? "bg-ink text-white rounded-br-md" : "bg-white border border-line rounded-bl-md",
-            )}
-          >
+          <div className={clsx("px-3.5 py-2 text-sm leading-relaxed", bubble)}>
             {m.kind === "voice" && (
-              <div className={clsx("flex items-center gap-1.5 text-[11px] mb-1", mine ? "text-white/60" : "text-muted")}>
+              <div className={clsx("flex items-center gap-1.5 text-[11px] mb-1", quiet)}>
                 <AudioLines className="h-3.5 w-3.5" /> Voice note · transcribed
               </div>
             )}

@@ -92,6 +92,17 @@ body {
   40% { transform: translateY(-4px); opacity: 1; }
 }
 
+.wa-wall {
+  background-color: #efeae2;
+  background-image: radial-gradient(rgba(80, 60, 40, 0.08) 0.7px, transparent 0.7px);
+  background-size: 14px 14px;
+}
+.tg-wall {
+  background:
+    radial-gradient(900px 420px at 10% -10%, rgba(255, 255, 255, 0.28), transparent 50%),
+    linear-gradient(180deg, #8eabc4 0%, #d5e4ef 100%);
+}
+
 .scroll-thin::-webkit-scrollbar { width: 8px; height: 8px; }
 .scroll-thin::-webkit-scrollbar-thumb { background: #d9d4c8; border-radius: 8px; }
 .scroll-thin::-webkit-scrollbar-track { background: transparent; }

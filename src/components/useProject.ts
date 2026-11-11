@@ -3,6 +3,14 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { Project } from "@/lib/types";
 import type { Action } from "@/lib/actions";
 
+export interface PhoneIntegration {
+  enabled: boolean;
+  contractorLinked: boolean;
+  clientLinked: boolean;
+  contractorAddress?: string;
+  clientAddress?: string;
+}
+
 export interface Integrations {
   telegram: {
     enabled: boolean;
@@ -11,6 +19,8 @@ export interface Integrations {
     contractorLinked: boolean;
     clientLinked: boolean;
   };
+  whatsapp: PhoneIntegration;
+  imessage: PhoneIntegration;
   ramp: { enabled: boolean; sandbox: boolean };
 }
 
