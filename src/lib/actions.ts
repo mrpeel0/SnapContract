@@ -2,7 +2,8 @@ import { getProject, mutate, saveProject } from "./db";
 import { analyzeMessages, draftAgreement } from "./ai/agents";
 import { budget, materialsSpend, money, paymentImpact, quoteChange } from "./pricing";
 import { fundTransactions, issueMaterialsFund, rampConfigured } from "./ramp";
-import { notifyTelegram } from "./telegram";
+import { notifyChannels } from "./notify";
+import { phoneDigits } from "./phone";
 import { emptyAgreement, uid, SAMPLE_PRICE_SHEET } from "./seed";
 import type { ChangeLine, ChangeOrder, Message, MessageKind, PaymentMilestone, PriceItem, Project, Role, AgreementSection, LineItem } from "./types";
 
@@ -65,11 +66,7 @@ async function drain(projectId: string) {
       pp.agentStatus = "idle";
       pp.agentStatusText = undefined;
     });
-    try {
-      await notifyTelegram(projectId);
-    } catch (e) {
-      console.error("telegram notify", e);
-    }
+    await notifyChannels(projectId);
   }
 }
 
@@ -155,6 +152,7 @@ export type Action =
   | { type: "issueMaterialCard"; coId: string }
   | { type: "syncRamp" }
   | { type: "linkTelegram"; role: Role; chatId: number }
+  | { type: "linkChannel"; channel: "whatsapp" | "imessage"; role: Role; address: string }
   | { type: "updatePriceSheet"; items: PriceItem[] };
 
 async function applyAction(projectId: string, a: Action): Promise<Project> {
@@ -321,6 +319,20 @@ async function applyAction(projectId: string, a: Action): Promise<Project> {
         sysMsg(pp, `${who} connected Telegram as the ${a.role}`);
         pp.channels.telegram.deliveredIds = pp.messages.map((m) => m.id);
       });
+    case "linkChannel": {
+      const address = phoneDigits(a.address);
+      return mutate(projectId, (pp) => {
+        pp.channels ??= {};
+        const current = pp.channels[a.channel] ?? {};
+        if (a.role === "contractor") current.contractorAddress = address;
+        else current.clientAddress = address;
+        current.deliveredIds = pp.messages.map((m) => m.id);
+        pp.channels[a.channel] = current;
+        const who = a.role === "contractor" ? pp.contractor.name : pp.client.name;
+        const label = a.channel === "whatsapp" ? "WhatsApp" : "iMessage";
+        sysMsg(pp, `${who} connected ${label} as the ${a.role}`);
+      });
+    }
     case "createManualChange":
       return mutate(projectId, (pp) => {
         const co: ChangeOrder = {
@@ -348,11 +360,7 @@ async function applyAction(projectId: string, a: Action): Promise<Project> {
 
 export async function runAction(projectId: string, a: Action): Promise<Project> {
   const project = await applyAction(projectId, a);
-  try {
-    await notifyTelegram(projectId);
-  } catch (e) {
-    console.error("telegram notify", e);
-  }
+  await notifyChannels(projectId);
   return getProject(projectId) ?? project;
 }
 

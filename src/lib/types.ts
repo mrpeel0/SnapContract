@@ -137,6 +137,12 @@ export interface TelegramChannel {
   deliveredIds?: string[];
 }
 
+export interface PhoneChannel {
+  contractorAddress?: string;
+  clientAddress?: string;
+  deliveredIds?: string[];
+}
+
 export interface Party {
   name: string;
   company?: string;
@@ -157,7 +163,7 @@ export interface Project {
   changeOrders: ChangeOrder[];
   invoices: InvoiceVersion[];
   purchases: MaterialPurchase[];
-  channels?: { telegram?: TelegramChannel };
+  channels?: { telegram?: TelegramChannel; whatsapp?: PhoneChannel; imessage?: PhoneChannel };
   agentStatus: "idle" | "thinking";
   agentStatusText?: string;
   aiMode?: "live" | "offline";

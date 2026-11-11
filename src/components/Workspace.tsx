@@ -5,9 +5,9 @@ import { motion } from "framer-motion";
 import { useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { ArrowLeft, Columns2, FileSignature, GitPullRequestArrow, MessagesSquare, ReceiptText, RotateCcw, Ruler, Sparkles, Zap } from "lucide-react";
-import type { Role } from "@/lib/types";
+import type { Project, Role } from "@/lib/types";
 import { budget } from "@/lib/pricing";
-import { useProject } from "./useProject";
+import { useProject, type Act, type Integrations } from "./useProject";
 import { Chat } from "./Chat";
 import { BudgetPanel } from "./BudgetPanel";
 import { AgreementView } from "./AgreementView";
@@ -15,6 +15,7 @@ import { InvoiceView } from "./InvoiceView";
 import { ChangeOrdersBoard } from "./ChangeOrdersBoard";
 import { RateSheet } from "./RateSheet";
 import { AnimatedMoney, Avatar, Logo } from "./ui";
+import { ChannelSwitcher, isSurface, PhoneFrame, type Surface } from "./Channels";
 
 const TABS = [
   { key: "chat", label: "Conversation", icon: MessagesSquare },
@@ -30,12 +31,15 @@ export function Workspace({ id }: { id: string }) {
   const router = useRouter();
   const [tab, setTab] = useState(params.get("tab") ?? "chat");
   const [role, setRole] = useState<Role>((params.get("as") as Role) ?? "contractor");
-  const [split, setSplit] = useState(false);
+  const [split, setSplit] = useState(params.get("split") === "1");
+  const initialChannel = params.get("channel");
+  const [surface, setSurface] = useState<Surface>(isSurface(initialChannel) ? initialChannel : "web");
 
   useEffect(() => {
-    const sp = new URLSearchParams({ tab, as: role });
+    const sp = new URLSearchParams({ tab, as: role, channel: surface });
+    if (split) sp.set("split", "1");
     router.replace(`?${sp.toString()}`, { scroll: false });
-  }, [tab, role, router]);
+  }, [tab, role, router, surface, split]);
 
   if (error && !project) return <div className="p-10 text-center text-muted">{error}</div>;
   if (!project) {
@@ -68,12 +72,12 @@ export function Workspace({ id }: { id: string }) {
               <span className="text-muted">Contract</span>
               <AnimatedMoney value={b.current} cents={false} className="font-semibold" />
             </div>
-            <span className={clsx("hidden lg:inline-flex items-center gap-1 text-[11.5px] font-semibold rounded-full px-2.5 py-1", integrations?.telegram.enabled ? "bg-[#229ED9]/10 text-[#1577a8]" : "bg-black/5 text-muted")} title={integrations?.telegram.enabled ? "Conversation is delivered through the Telegram bot" : "Set TELEGRAM_BOT_TOKEN to run this chat in Telegram"}>
-              Telegram {integrations?.telegram.enabled ? "on" : "off"}
-            </span>
-            <span className={clsx("hidden lg:inline-flex items-center gap-1 text-[11.5px] font-semibold rounded-full px-2.5 py-1", integrations?.ramp.enabled ? "bg-good/12 text-[#067a55]" : "bg-black/5 text-muted")} title={integrations?.ramp.enabled ? (integrations.ramp.sandbox ? "Ramp sandbox" : "Ramp production") : "Set RAMP_CLIENT_ID and RAMP_CLIENT_SECRET to issue real cards"}>
-              Ramp {integrations?.ramp.enabled ? (integrations.ramp.sandbox ? "sandbox" : "live") : "off"}
-            </span>
+            <div className="hidden xl:flex items-center gap-3 text-[11px] font-medium text-muted">
+              <Live label="Telegram" on={Boolean(integrations?.telegram.enabled)} />
+              <Live label="WhatsApp" on={Boolean(integrations?.whatsapp?.enabled)} />
+              <Live label="iMessage" on={Boolean(integrations?.imessage?.enabled)} />
+              <Live label={integrations?.ramp.enabled ? (integrations.ramp.sandbox ? "Ramp sandbox" : "Ramp") : "Ramp"} on={Boolean(integrations?.ramp.enabled)} />
+            </div>
             <span
               title={ai === "claude" ? "Using Claude for change detection and drafting" : ai === "local" ? "Using a local model through Ollama" : "No ANTHROPIC_API_KEY or LOCAL_MODEL set: using the built-in offline engine"}
               className={clsx("hidden md:inline-flex items-center gap-1 text-[11.5px] font-semibold rounded-full px-2.5 py-1", ai ? "bg-agent/10 text-agent" : "bg-black/5 text-muted")}
@@ -132,33 +136,51 @@ export function Workspace({ id }: { id: string }) {
             })}
           </nav>
         )}
+        <div className="flex items-center gap-3 border-t border-line/80 px-4 py-2 bg-white/70">
+          <ChannelSwitcher
+            value={surface}
+            onChange={(next) => {
+              setSurface(next);
+              if (next !== "web") setTab("chat");
+            }}
+            live={{
+              web: true,
+              telegram: Boolean(integrations?.telegram.enabled),
+              whatsapp: Boolean(integrations?.whatsapp?.enabled),
+              imessage: Boolean(integrations?.imessage?.enabled),
+            }}
+          />
+          <span className="ml-auto hidden lg:block text-[11.5px] text-muted">Same thread on every app. A colored dot means live delivery is connected.</span>
+        </div>
       </header>
 
       {split ? (
-        <div className="flex-1 min-h-0 grid grid-cols-[1fr_1fr_340px]">
+        <div className={clsx("flex-1 min-h-0 grid grid-cols-[1fr_1fr_340px]", surface === "web" ? "bg-transparent" : "bg-[#0e1116]")}>
           {(["contractor", "client"] as Role[]).map((r) => {
             const party = r === "contractor" ? project.contractor : project.client;
             return (
-              <div key={r} className="min-h-0 flex flex-col border-r border-line">
-                <div className={clsx("shrink-0 px-4 py-2.5 flex items-center gap-2 text-[13px] border-b border-line", r === "contractor" ? "bg-ink text-white" : "bg-gradient-to-r from-accent to-accent-2 text-white")}>
-                  <Avatar name={party.name} tone={r === "contractor" ? "ink" : "accent"} size={24} />
-                  <span className="font-semibold">{party.name}</span>
-                  <span className="opacity-70 capitalize">· {r}&apos;s phone</span>
-                </div>
-                <Chat project={project} role={r} act={act} className="flex-1" dense telegram={integrations?.telegram} ramp={integrations?.ramp.enabled} />
+              <div key={r} className={clsx("min-h-0 flex flex-col", surface === "web" && "border-r border-line")}>
+                {surface === "web" && (
+                  <div className={clsx("shrink-0 px-4 py-2.5 flex items-center gap-2 text-[13px] border-b border-line", r === "contractor" ? "bg-ink text-white" : "bg-gradient-to-r from-accent to-accent-2 text-white")}>
+                    <Avatar name={party.name} tone={r === "contractor" ? "ink" : "accent"} size={24} />
+                    <span className="font-semibold">{party.name}</span>
+                    <span className="opacity-70 capitalize">· {r}</span>
+                  </div>
+                )}
+                <Thread project={project} role={r} act={act} surface={surface} integrations={integrations} ramp={integrations?.ramp.enabled} />
               </div>
             );
           })}
-          <div className="min-h-0 overflow-y-auto scroll-thin p-4">
+          <div className={clsx("min-h-0 overflow-y-auto scroll-thin p-4", surface !== "web" && "bg-[#f6f4ef]")}>
             <BudgetPanel project={project} role="contractor" />
           </div>
         </div>
       ) : (
         <main className="flex-1 min-h-0 overflow-y-auto scroll-thin">
           {tab === "chat" && (
-            <div className="h-full grid lg:grid-cols-[1fr_360px] gap-0">
-              <Chat project={project} role={role} act={act} className="min-h-0 border-r border-line" telegram={integrations?.telegram} ramp={integrations?.ramp.enabled} />
-              <div className="hidden lg:block overflow-y-auto scroll-thin p-5">
+            <div className={clsx("h-full grid lg:grid-cols-[1fr_360px] gap-0", surface !== "web" && "bg-[#0e1116]")}>
+              <Thread project={project} role={role} act={act} surface={surface} integrations={integrations} ramp={integrations?.ramp.enabled} className={surface === "web" ? "border-r border-line" : ""} />
+              <div className={clsx("hidden lg:block overflow-y-auto scroll-thin p-5", surface !== "web" && "bg-[#f6f4ef]")}>
                 <BudgetPanel project={project} role={role} onOpen={setTab} />
               </div>
             </div>
@@ -171,6 +193,60 @@ export function Workspace({ id }: { id: string }) {
           </div>
         </main>
       )}
+    </div>
+  );
+}
+
+function Live({ label, on }: { label: string; on: boolean }) {
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <span className={clsx("h-1.5 w-1.5 rounded-full", on ? "bg-good" : "bg-black/20")} />
+      {label}
+    </span>
+  );
+}
+
+function Thread({
+  project,
+  role,
+  act,
+  surface,
+  integrations,
+  ramp,
+  className,
+}: {
+  project: Project;
+  role: Role;
+  act: Act;
+  surface: Surface;
+  integrations: Integrations | null;
+  ramp?: boolean;
+  className?: string;
+}) {
+  const party = role === "contractor" ? project.contractor : project.client;
+  const chat = <Chat project={project} role={role} act={act} className="flex-1 min-h-0" dense={surface !== "web"} ramp={ramp} skin={surface} />;
+  if (surface === "web") return <div className={clsx("min-h-0 flex flex-col h-full", className)}>{chat}</div>;
+  const phone = surface === "whatsapp" ? integrations?.whatsapp : surface === "imessage" ? integrations?.imessage : undefined;
+  return (
+    <div className={clsx("min-h-0 h-full", className)}>
+      <PhoneFrame
+        surface={surface}
+        name={party.name}
+        role={role}
+        live={surface === "telegram" ? Boolean(integrations?.telegram.enabled) : Boolean(phone?.enabled)}
+        linkedAddress={role === "contractor" ? phone?.contractorAddress : phone?.clientAddress}
+        otherLinked={surface === "telegram" ? Boolean(role === "contractor" ? integrations?.telegram.clientLinked : integrations?.telegram.contractorLinked) : Boolean(role === "contractor" ? phone?.clientLinked : phone?.contractorLinked)}
+        telegram={integrations?.telegram}
+        onLink={
+          surface === "telegram"
+            ? undefined
+            : async (address) => {
+                await act({ type: "linkChannel", channel: surface, role, address });
+              }
+        }
+      >
+        {chat}
+      </PhoneFrame>
     </div>
   );
 }
