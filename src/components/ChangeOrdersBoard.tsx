@@ -59,7 +59,7 @@ export function ChangeOrdersBoard({ project, role, act, ramp }: { project: Proje
               <button
                 key={c.id}
                 onClick={() => setSelected(c.id)}
-                className={clsx("w-full text-left rounded-2xl border bg-white p-3.5 transition-all cursor-pointer", sel?.id === c.id ? "border-agent/50 shadow-[0_8px_30px_-12px_rgba(107,92,255,0.4)]" : "border-line hover:border-ink/20")}
+                className={clsx("w-full text-left rounded-2xl border bg-white p-3.5 transition-all cursor-pointer", sel?.id === c.id ? "border-agent/50 ring-2 ring-agent/15 elevated" : "border-line hover:border-ink/20")}
               >
                 <div className="flex items-center justify-between gap-2">
                   <span className="font-mono text-[11px] text-muted">CO-{c.number}</span>

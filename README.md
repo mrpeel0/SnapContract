@@ -14,6 +14,11 @@ npm run dev        # http://localhost:3000
 2. `LOCAL_MODEL=qwen2.5:7b` → a local model through Ollama (`ollama pull qwen2.5:7b`). Free and private; ~5–13 s per chat message and ~45 s to draft an agreement on a 16 GB Mac.
 3. Neither → a built-in offline engine tuned to the demo phrases.
 
+**Messaging apps.** The project conversation also runs in WhatsApp, iMessage and Telegram. Each side opens **Phones** in the project header and scans the QR code for their role. Messages sync both ways, change orders arrive with Approve / Decline (or Send) buttons, and typed commands work too: `approve 2`, `decline 2`, `send 2`, `status`. Add `?connect=1` to a project URL to open the connect screen directly.
+- **Telegram:** `TELEGRAM_BOT_TOKEN` from @BotFather. Uses long polling, so no public URL is needed.
+- **WhatsApp:** Meta Cloud API. Set `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_NUMBER_ID` and `WHATSAPP_VERIFY_TOKEN`, expose the app (`npx cloudflared tunnel --url http://localhost:3000` or ngrok) and point the webhook at `https://<tunnel>/api/whatsapp` with the same verify token, subscribed to `messages`. With the free test number, add each phone under "To" recipients first.
+- **iMessage:** macOS only. Sign Messages into an Apple ID, set `IMESSAGE_ENABLED=1` and `IMESSAGE_HANDLE` (that Apple ID's email or number), and give your terminal Full Disk Access so the app can read incoming texts. Text it from a *different* Apple ID.
+
 If a model call fails or returns invalid JSON, the app falls back to the offline engine, so the demo never dead-ends. The header badge shows which provider is active.
 
 Every model proposal passes through `src/lib/ai/guardrails.ts` before it becomes a change order: only rate-sheet SKUs, swaps always credit the old material, installed items include their fixture, quantities are never invented (the agent asks), replies attach to the open change order, and drafted baselines only include items named in the scope.
@@ -40,5 +45,6 @@ Reset demo data with the ↻ button in the header.
   - **Contract drafter** → scope sections, priced baseline, payment schedule, change policy.
   - **Change detector** → `{changes: [{lines, question, updatesChangeOrderNumber, …}]}` per new message.
 - `src/lib/ai/offline.ts`: deterministic fallback used when there's no API key or the call fails.
+- `src/lib/channels/`: one channel layer (`core.ts` handles linking, commands and message formatting) with adapters for `telegram.ts`, `whatsapp.ts` (webhook at `/api/whatsapp`) and `imessage.ts`.
 - `src/lib/actions.ts`: server reducer for every action (post message, send/approve/decline CO, sign agreement…) plus a per-project agent queue.
 - Change order lifecycle: `needs_info → contractor_review → client_review → approved | declined | void`, with a full audit trail.

@@ -51,14 +51,14 @@ export function ChangeOrderCard({ project, co, role, act, compact, ramp }: { pro
     run(async () => {
       await act({ type: "approveChange", coId: co.id, name: sigName });
       setSigning(false);
-      confetti({ particleCount: 140, spread: 80, origin: { y: 0.7 }, colors: ["#f26b1d", "#ffb020", "#10b981", "#6b5cff"] });
+      confetti({ particleCount: 140, spread: 80, origin: { y: 0.7 }, colors: ["#e8590c", "#0e9f6e", "#5b4fe0", "#0f1012"] });
     });
 
   return (
-    <motion.div layout initial={{ opacity: 0, y: 12, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} className={clsx("agent-border rounded-2xl overflow-hidden shadow-[0_12px_40px_-18px_rgba(107,92,255,0.45)]")}>
+    <motion.div layout initial={{ opacity: 0, y: 12, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} className={clsx("agent-border rounded-2xl overflow-hidden elevated")}>
       {/* header */}
-      <div className="flex items-start gap-3 px-4 pt-3.5 pb-3 bg-gradient-to-r from-agent/[0.06] via-transparent to-accent/[0.05]">
-        <div className="mt-0.5 h-8 w-8 shrink-0 rounded-xl bg-gradient-to-br from-agent to-agent-2 grid place-items-center text-white">
+      <div className="flex items-start gap-3 px-4 pt-3.5 pb-3 bg-agent/[0.035]">
+        <div className="mt-0.5 h-8 w-8 shrink-0 rounded-xl bg-agent grid place-items-center text-white">
           <Sparkles className="h-4 w-4" />
         </div>
         <div className="min-w-0 flex-1">
@@ -68,7 +68,7 @@ export function ChangeOrderCard({ project, co, role, act, compact, ramp }: { pro
             {co.confidence < 1 && !hiddenFromClient && (
               <span className="text-[11px] text-muted inline-flex items-center gap-1" title="Agent confidence">
                 <span className="h-1 w-10 rounded-full bg-black/10 overflow-hidden inline-block">
-                  <span className="block h-full bg-gradient-to-r from-agent to-agent-2" style={{ width: `${Math.round(co.confidence * 100)}%` }} />
+                  <span className="block h-full bg-agent" style={{ width: `${Math.round(co.confidence * 100)}%` }} />
                 </span>
                 {Math.round(co.confidence * 100)}%
               </span>
@@ -243,7 +243,7 @@ export function ChangeOrderCard({ project, co, role, act, compact, ramp }: { pro
                       Type your name to approve <b className="text-ink">{money(quote.total, { sign: true })}</b> and authorize this work.
                     </div>
                     <div className="flex gap-2">
-                      <input value={sigName} onChange={(e) => setSigName(e.target.value)} className="flex-1 rounded-lg border border-line bg-white px-3 font-[cursive] text-lg italic" />
+                      <input value={sigName} onChange={(e) => setSigName(e.target.value)} className="flex-1 rounded-lg border border-line bg-white px-3 font-sign text-[22px]" />
                       <Button variant="good" size="md" disabled={busy || sigName.trim().length < 2} onClick={approve}>
                         <PenLine className="h-4 w-4" /> Sign & approve
                       </Button>
@@ -271,7 +271,7 @@ export function ChangeOrderCard({ project, co, role, act, compact, ramp }: { pro
               <div className="space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="text-[12px] text-muted flex items-center gap-1.5">
-                    <ShieldCheck className="h-4 w-4 text-good" /> Signed by <span className="font-[cursive] italic text-ink text-[15px]">{co.approval.name}</span> · {new Date(co.approval.at).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
+                    <ShieldCheck className="h-4 w-4 text-good" /> Signed by <span className="font-sign text-ink text-[19px]">{co.approval.name}</span> · {new Date(co.approval.at).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
                   </div>
                   <motion.div initial={{ scale: 2, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ type: "spring", stiffness: 300, damping: 14 }} className="stamp rounded-md px-2 py-0.5 text-[11px] font-bold">
                     APPROVED

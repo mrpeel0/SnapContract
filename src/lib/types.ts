@@ -88,12 +88,15 @@ export interface ChangeOrder {
 
 export type MessageKind = "text" | "voice" | "transcript" | "event";
 
+export type ChannelKind = "telegram" | "whatsapp" | "imessage";
+
 export interface Message {
   id: string;
   author: Author;
   kind: MessageKind;
   body: string;
   createdAt: string;
+  via?: ChannelKind; // arrived from a messaging app instead of the web app
   changeOrderId?: string; // agent cards link to a change order
   visibleTo?: Role[]; // undefined = everyone
 }
@@ -131,10 +134,14 @@ export interface MaterialPurchase {
   transactions?: RampTransaction[];
 }
 
-export interface TelegramChannel {
+/** Which phone/chat is linked to each side of the project on one messaging app. */
+export interface ChannelLink {
+  contractor?: string;
+  client?: string;
+  deliveredIds?: string[];
+  /** legacy Telegram fields, migrated on load */
   contractorChatId?: number;
   clientChatId?: number;
-  deliveredIds?: string[];
 }
 
 export interface Party {
@@ -157,7 +164,7 @@ export interface Project {
   changeOrders: ChangeOrder[];
   invoices: InvoiceVersion[];
   purchases: MaterialPurchase[];
-  channels?: { telegram?: TelegramChannel };
+  channels?: Partial<Record<ChannelKind, ChannelLink>>;
   agentStatus: "idle" | "thinking";
   agentStatusText?: string;
   aiMode?: "live" | "offline";

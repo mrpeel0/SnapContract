@@ -150,7 +150,7 @@ export function InvoiceView({ project, role, act, ramp }: { project: Project; ro
                         <div className="inline-flex items-center gap-3 rounded-lg border border-good/30 bg-good/5 px-3 py-1.5">
                           <ShieldCheck className="h-4 w-4 text-good" />
                           <div>
-                            <div className="font-[cursive] italic text-[16px] leading-none text-ink">{co.approval.name}</div>
+                            <div className="font-sign text-[20px] leading-none text-ink">{co.approval.name}</div>
                             <div className="text-[11px] text-muted mt-0.5">Approved {new Date(co.approval.at).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })} · {money(co.approval.total, { sign: true })}</div>
                           </div>
                         </div>

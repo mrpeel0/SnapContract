@@ -1,12 +1,14 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
 import { z } from "zod";
+import { openaiStructured } from "./openai";
 
 export const MODEL = "claude-opus-5-5";
-export type AiProvider = "claude" | "local" | null;
+export type AiProvider = "openai" | "claude" | "local" | null;
 
-/** Claude if a key is set, otherwise a local Ollama model if LOCAL_MODEL is set, otherwise offline engine. */
+/** OpenAI if OPENAI_API_KEY is set, then Claude, then a local Ollama model (LOCAL_MODEL), otherwise the offline engine. */
 export function aiProvider(): AiProvider {
+  if (process.env.OPENAI_API_KEY) return "openai";
   if (process.env.ANTHROPIC_API_KEY || process.env.ANTHROPIC_AUTH_TOKEN) return "claude";
   if (process.env.LOCAL_MODEL) return "local";
   return null;
@@ -32,6 +34,7 @@ export async function structured<S extends z.ZodType>(opts: {
   schema: S;
   effort?: "low" | "medium" | "high";
 }): Promise<z.infer<S> | null> {
+  if (aiProvider() === "openai") return openaiStructured(opts);
   if (aiProvider() === "local") return localStructured(opts);
 
   const res = await client().beta.messages.parse({

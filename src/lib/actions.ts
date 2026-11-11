@@ -1,10 +1,11 @@
-import { getProject, mutate, saveProject } from "./db";
+import { getProject, listProjects, mutate, saveProject } from "./db";
 import { analyzeMessages, draftAgreement } from "./ai/agents";
 import { budget, materialsSpend, money, paymentImpact, quoteChange } from "./pricing";
 import { fundTransactions, issueMaterialsFund, rampConfigured } from "./ramp";
-import { notifyTelegram } from "./telegram";
+import { notifyChannels } from "./channels";
+import { CHANNEL_LABEL } from "./channels/core";
 import { emptyAgreement, uid, SAMPLE_PRICE_SHEET } from "./seed";
-import type { ChangeLine, ChangeOrder, Message, MessageKind, PaymentMilestone, PriceItem, Project, Role, AgreementSection, LineItem } from "./types";
+import type { ChangeLine, ChangeOrder, ChannelKind, Message, MessageKind, PaymentMilestone, PriceItem, Project, Role, AgreementSection, LineItem } from "./types";
 
 const now = () => new Date().toISOString();
 
@@ -66,9 +67,9 @@ async function drain(projectId: string) {
       pp.agentStatusText = undefined;
     });
     try {
-      await notifyTelegram(projectId);
+      await notifyChannels(projectId);
     } catch (e) {
-      console.error("telegram notify", e);
+      console.error("channel notify", e);
     }
   }
 }
@@ -142,7 +143,7 @@ async function runDraft(projectId: string) {
 
 // ---------- public actions ----------
 export type Action =
-  | { type: "postMessage"; author: Role; kind: MessageKind; body: string }
+  | { type: "postMessage"; author: Role; kind: MessageKind; body: string; via?: ChannelKind }
   | { type: "draftAgreement" }
   | { type: "updateAgreement"; sections?: AgreementSection[]; baseline?: LineItem[]; payments?: PaymentMilestone[]; changeMarkupPct?: number; timelineWeeks?: number; summary?: string }
   | { type: "signAgreement"; role: Role; name: string }
@@ -154,13 +155,13 @@ export type Action =
   | { type: "createManualChange" }
   | { type: "issueMaterialCard"; coId: string }
   | { type: "syncRamp" }
-  | { type: "linkTelegram"; role: Role; chatId: number }
+  | { type: "linkChannel"; channel: ChannelKind; role: Role; sender: string }
   | { type: "updatePriceSheet"; items: PriceItem[] };
 
 async function applyAction(projectId: string, a: Action): Promise<Project> {
   switch (a.type) {
     case "postMessage": {
-      const msg: Message = { id: uid("m"), author: a.author, kind: a.kind, body: a.body.trim(), createdAt: now() };
+      const msg: Message = { id: uid("m"), author: a.author, kind: a.kind, body: a.body.trim(), createdAt: now(), ...(a.via ? { via: a.via } : {}) };
       if (!msg.body) throw new Error("Empty message");
       const p = mutate(projectId, (pp) => {
         pp.messages.push(msg);
@@ -311,16 +312,28 @@ async function applyAction(projectId: string, a: Action): Promise<Project> {
         }
       });
     }
-    case "linkTelegram":
+    case "linkChannel": {
+      // One phone follows one project per app: joining a new project detaches it from the old one.
+      for (const other of listProjects()) {
+        const l = other.channels?.[a.channel];
+        if (other.id === projectId || !l || (l.contractor !== a.sender && l.client !== a.sender)) continue;
+        mutate(other.id, (pp) => {
+          const ll = pp.channels![a.channel]!;
+          if (ll.contractor === a.sender) delete ll.contractor;
+          if (ll.client === a.sender) delete ll.client;
+        });
+      }
       return mutate(projectId, (pp) => {
         pp.channels ??= {};
-        pp.channels.telegram ??= {};
-        if (a.role === "contractor") pp.channels.telegram.contractorChatId = a.chatId;
-        else pp.channels.telegram.clientChatId = a.chatId;
+        const l = (pp.channels[a.channel] ??= {});
+        const otherRole: Role = a.role === "contractor" ? "client" : "contractor";
+        if (l[otherRole] === a.sender) delete l[otherRole]; // same phone switching sides
+        l[a.role] = a.sender;
         const who = a.role === "contractor" ? pp.contractor.name : pp.client.name;
-        sysMsg(pp, `${who} connected Telegram as the ${a.role}`);
-        pp.channels.telegram.deliveredIds = pp.messages.map((m) => m.id);
+        sysMsg(pp, `${who} joined from ${CHANNEL_LABEL[a.channel]}`);
+        l.deliveredIds = pp.messages.map((m) => m.id);
       });
+    }
     case "createManualChange":
       return mutate(projectId, (pp) => {
         const co: ChangeOrder = {
@@ -349,9 +362,9 @@ async function applyAction(projectId: string, a: Action): Promise<Project> {
 export async function runAction(projectId: string, a: Action): Promise<Project> {
   const project = await applyAction(projectId, a);
   try {
-    await notifyTelegram(projectId);
+    await notifyChannels(projectId);
   } catch (e) {
-    console.error("telegram notify", e);
+    console.error("channel notify", e);
   }
   return getProject(projectId) ?? project;
 }

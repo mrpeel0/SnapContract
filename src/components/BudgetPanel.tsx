@@ -26,7 +26,7 @@ export function BudgetPanel({ project, role, onOpen }: { project: Project; role:
   return (
     <div className="space-y-4">
       <Card className="p-5 overflow-hidden relative">
-        <div className="absolute -right-10 -top-10 h-40 w-40 rounded-full bg-gradient-to-br from-accent/20 to-agent/10 blur-2xl" />
+        
         <div className="text-[11.5px] uppercase tracking-wider text-muted font-semibold flex items-center gap-1.5">
           <CircleDollarSign className="h-3.5 w-3.5" /> Current contract value
         </div>

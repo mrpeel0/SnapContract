@@ -46,6 +46,13 @@ function persist() {
 
 function normalize(p: Project): Project {
   p.purchases ??= [];
+  const tg = p.channels?.telegram;
+  if (tg && (tg.contractorChatId || tg.clientChatId)) {
+    if (tg.contractorChatId) tg.contractor ??= String(tg.contractorChatId);
+    if (tg.clientChatId) tg.client ??= String(tg.clientChatId);
+    delete tg.contractorChatId;
+    delete tg.clientChatId;
+  }
   return p;
 }
 

@@ -15,7 +15,7 @@ export function AgreementView({ project, role, act }: { project: Project; role: 
   if (a.status === "none") {
     return (
       <div className="max-w-2xl mx-auto py-14 text-center">
-        <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="mx-auto h-16 w-16 rounded-2xl bg-gradient-to-br from-agent to-agent-2 grid place-items-center text-white shadow-[0_16px_40px_-12px_rgba(107,92,255,0.7)]">
+        <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="mx-auto h-16 w-16 rounded-2xl bg-ink grid place-items-center text-white elevated">
           <FileSignature className="h-8 w-8" />
         </motion.div>
         <h2 className="mt-5 text-2xl font-semibold tracking-tight">Draft the agreement</h2>
@@ -206,7 +206,7 @@ export function AgreementView({ project, role, act }: { project: Project; role: 
                 <div className="text-[11px] text-muted capitalize">{r}</div>
                 {sig ? (
                   <>
-                    <div className="font-[cursive] italic text-xl">{sig.name}</div>
+                    <div className="font-sign text-2xl">{sig.name}</div>
                     <div className="text-[11px] text-muted">{new Date(sig.at).toLocaleString()}</div>
                   </>
                 ) : (
@@ -217,7 +217,7 @@ export function AgreementView({ project, role, act }: { project: Project; role: 
           })}
           {!signed && !a.signatures[role] && (
             <div className="mt-3">
-              <input value={name} onChange={(e) => setName(e.target.value)} className="w-full rounded-lg border border-line px-3 py-2 font-[cursive] italic text-lg" />
+              <input value={name} onChange={(e) => setName(e.target.value)} className="w-full rounded-lg border border-line px-3 py-1.5 font-sign text-[22px]" />
               <Button variant="good" className="w-full mt-2" onClick={() => act({ type: "signAgreement", role, name })} disabled={name.trim().length < 2}>
                 <PenLine className="h-4 w-4" /> Sign as {role}
               </Button>

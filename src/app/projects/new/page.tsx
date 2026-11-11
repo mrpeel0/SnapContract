@@ -126,7 +126,7 @@ export default function NewProject() {
           {step === 2 && (
             <motion.div key="2" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
               <Card className="mt-6 p-8 text-center">
-                <div className="mx-auto h-14 w-14 rounded-2xl bg-gradient-to-br from-agent to-agent-2 grid place-items-center text-white">
+                <div className="mx-auto h-14 w-14 rounded-2xl bg-ink grid place-items-center text-white">
                   <Sparkles className="h-7 w-7" />
                 </div>
                 <h2 className="text-xl font-semibold mt-4">Ready to draft {form.name}</h2>
@@ -142,7 +142,7 @@ export default function NewProject() {
           )}
         </AnimatePresence>
       </div>
-      <style>{`.inp{width:100%;height:40px;border-radius:12px;border:1px solid var(--line);background:white;padding:0 12px;font-size:14px;outline:none}.inp:focus{border-color:rgba(21,23,28,.3)}`}</style>
+      <style>{`.inp{width:100%;height:38px;border-radius:8px;border:1px solid var(--line-strong);background:white;padding:0 12px;font-size:14px;outline:none;transition:border-color .15s,box-shadow .15s}.inp:focus{border-color:rgba(15,16,18,.4);box-shadow:0 0 0 4px rgba(15,16,18,.05)}`}</style>
     </div>
   );
 }

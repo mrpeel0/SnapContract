@@ -92,7 +92,7 @@ export function ProfitabilityPanel({ project }: { project: Project }) {
 
 export function ProjectCardFace({ last4, amount, memo, source }: { last4: string; amount: number; memo: string; source?: "ramp" | "demo" }) {
   return (
-    <div className="rounded-2xl bg-gradient-to-br from-[#15171c] to-[#3a2d55] text-white p-4">
+    <div className="rounded-2xl bg-[radial-gradient(120%_120%_at_100%_0%,#3b3f4a_0%,#15171c_55%,#0b0c0e_100%)] ring-1 ring-white/5 text-white p-4">
       <div className="flex justify-between text-[10px] uppercase tracking-[0.16em] text-white/55">
         <span>{source === "ramp" ? "Ramp card" : "Demo card"}</span>
         <span>Virtual</span>

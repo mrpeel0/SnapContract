@@ -62,7 +62,7 @@ async function rampFetch(path: string, init: RequestInit = {}) {
 
 async function cardholderId() {
   if (process.env.RAMP_USER_ID) return process.env.RAMP_USER_ID;
-  const body = await rampFetch("/developer/v1/users?page_size=1");
+  const body = await rampFetch("/developer/v1/users?page_size=2");
   const data = body.data as { id?: string }[] | undefined;
   const id = data?.[0]?.id;
   if (!id) throw new Error("Ramp has no users to own the card. Set RAMP_USER_ID.");

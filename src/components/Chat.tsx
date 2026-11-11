@@ -4,9 +4,10 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { FileText, Mic, MicOff, SendHorizontal, Sparkles, Square, Wand2, X, AudioLines } from "lucide-react";
 import type { Message, Project, Role } from "@/lib/types";
-import { Avatar, Button, timeAgo } from "./ui";
+import { Avatar, Button, CHANNEL_META, ChannelIcon, timeAgo } from "./ui";
+import { ChannelStrip } from "./Channels";
 import { ChangeOrderCard } from "./ChangeOrderCard";
-import type { Act, Integrations } from "./useProject";
+import type { Act, ChannelInfo } from "./useProject";
 
 const QUICK: Record<Role, string[]> = {
   client: [
@@ -31,7 +32,7 @@ Priya: And can we add dimmer switches for the recessed lights? Two dimmers I thi
 Marcus: Sure. Anything else?
 Priya: No, that's it. Oh, and the dog door is on hold, we'll talk later.`;
 
-export function Chat({ project, role, act, className, dense, telegram, ramp }: { project: Project; role: Role; act: Act; className?: string; dense?: boolean; telegram?: Integrations["telegram"]; ramp?: boolean }) {
+export function Chat({ project, role, act, className, dense, channels, onConnect, ramp }: { project: Project; role: Role; act: Act; className?: string; dense?: boolean; channels?: ChannelInfo[]; onConnect?: () => void; ramp?: boolean }) {
   const [text, setText] = useState("");
   const [showTranscript, setShowTranscript] = useState(false);
   const [transcript, setTranscript] = useState("");
@@ -39,7 +40,6 @@ export function Chat({ project, role, act, className, dense, telegram, ramp }: {
   const voice = useVoice((t) => setText(t));
   const [sending, setSending] = useState(false);
   const [voiceMode, setVoiceMode] = useState(false);
-  const [appComposer, setAppComposer] = useState(false);
 
   const visible = useMemo(() => project.messages.filter((m) => !m.visibleTo || m.visibleTo.includes(role)), [project.messages, role]);
 
@@ -76,11 +76,11 @@ export function Chat({ project, role, act, className, dense, telegram, ramp }: {
   const locked = project.agreement.status !== "signed";
 
   return (
-    <div className={clsx("flex flex-col min-h-0 bg-white/60", className)}>
+    <div className={clsx("flex flex-col min-h-0 bg-[#fbfbfa]", className)}>
       <div ref={scroller} className={clsx("flex-1 overflow-y-auto scroll-thin space-y-3", dense ? "p-3" : "p-5")}>
         {locked && (
-          <div className="mx-auto max-w-md text-center text-[13px] text-muted rounded-xl border border-dashed border-line p-4 bg-white">
-            The agent starts watching for changes once the agreement is signed by both sides.
+          <div className="mx-auto max-w-md text-center text-[13px] text-muted rounded-xl border border-dashed border-line-strong p-4 bg-white">
+            The agent starts watching for changes once both sides sign the agreement.
           </div>
         )}
         <AnimatePresence initial={false}>
@@ -91,7 +91,7 @@ export function Chat({ project, role, act, className, dense, telegram, ramp }: {
         {thinking && (
           <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="flex items-center gap-2.5">
             <Avatar name="AI" tone="agent" size={28} />
-            <div className="rounded-2xl rounded-tl-md bg-white border border-line px-3.5 py-2 text-[13px] flex items-center gap-2">
+            <div className="rounded-2xl rounded-tl-md agent-border px-3.5 py-2 text-[13px] flex items-center gap-2">
               <span className="dot-pulse flex gap-1"><span /><span /><span /></span>
               <span className="shimmer-text font-medium">{project.agentStatusText ?? "Thinking…"}</span>
             </div>
@@ -101,24 +101,19 @@ export function Chat({ project, role, act, className, dense, telegram, ramp }: {
 
       {/* composer */}
       <div className={clsx("border-t border-line bg-white", dense ? "p-2.5" : "p-3.5")}>
-        {telegram?.enabled && !appComposer ? (
-          <TelegramBar telegram={telegram} role={role} onTypeHere={() => setAppComposer(true)} />
-        ) : (
-          <>
-        {telegram?.enabled && (
-          <button onClick={() => setAppComposer(false)} className="mb-2 text-[12px] font-medium text-[#1577a8] cursor-pointer">Back to Telegram</button>
+        {channels && onConnect && (
+          <div className="mb-2">
+            <ChannelStrip channels={channels} role={role} onConnect={onConnect} dense={dense} />
+          </div>
         )}
-        {!telegram?.enabled && (
-          <div className="mb-2 text-[12px] text-muted">This thread can run in Telegram. Add <span className="font-mono">TELEGRAM_BOT_TOKEN</span> and restart the server.</div>
-        )}
-        <div className="flex gap-1.5 overflow-x-auto scroll-thin pb-2 -mx-0.5 px-0.5">
+        <div className="flex gap-1.5 overflow-x-auto no-scrollbar pb-2 -mx-0.5 px-0.5">
           {QUICK[role].map((q) => (
-            <button key={q} onClick={() => setText(q)} className="shrink-0 rounded-full border border-line bg-bg/60 px-3 py-1 text-[12px] text-ink/80 hover:border-accent/50 hover:text-accent transition-colors cursor-pointer">
+            <button key={q} onClick={() => setText(q)} className="shrink-0 rounded-full border border-line bg-white px-3 py-1 text-[12px] text-ink/75 hover:bg-sunken hover:text-ink hover:border-line-strong transition-colors cursor-pointer">
               {q}
             </button>
           ))}
         </div>
-        <div className={clsx("flex items-end gap-2 rounded-2xl border bg-white px-2 py-1.5 transition-colors", voice.listening ? "border-bad/50 ring-4 ring-bad/10" : "border-line focus-within:border-ink/30")}>
+        <div className={clsx("flex items-end gap-2 rounded-xl border bg-white px-2 py-1.5 transition-colors shadow-[0_1px_2px_rgba(15,16,18,0.04)]", voice.listening ? "border-bad/50 ring-4 ring-bad/10" : "border-line-strong focus-within:border-ink/40 focus-within:ring-4 focus-within:ring-black/[0.04]")}>
           <Avatar name={me.name} tone={role === "contractor" ? "ink" : "accent"} size={28} />
           {voice.listening ? (
             <div className="flex-1 py-1.5 text-sm flex items-center gap-2 min-h-9">
@@ -166,9 +161,7 @@ export function Chat({ project, role, act, className, dense, telegram, ramp }: {
             <SendHorizontal className="h-4 w-4" />
           </Button>
         </div>
-        {voiceMode && !voice.listening && text && <div className="text-[11px] text-muted mt-1 pl-1">🎙 Will send as a transcribed voice note</div>}
-          </>
-        )}
+        {voiceMode && !voice.listening && text && <div className="text-[11px] text-muted mt-1 pl-1 flex items-center gap-1"><AudioLines className="h-3 w-3" /> Sends as a transcribed voice note</div>}
       </div>
 
       <AnimatePresence>
@@ -207,33 +200,11 @@ export function Chat({ project, role, act, className, dense, telegram, ramp }: {
   );
 }
 
-function TelegramBar({ telegram, role, onTypeHere }: { telegram: Integrations["telegram"]; role: Role; onTypeHere: () => void }) {
-  const link = role === "contractor" ? telegram.links?.contractor : telegram.links?.client;
-  const linked = role === "contractor" ? telegram.contractorLinked : telegram.clientLinked;
-  const otherLinked = role === "contractor" ? telegram.clientLinked : telegram.contractorLinked;
-  return (
-    <div className="rounded-2xl border border-[#229ED9]/30 bg-[#229ED9]/5 px-3 py-2.5">
-      <div className="text-[13px] font-semibold text-[#1577a8]">This conversation runs in Telegram</div>
-      <div className="mt-1 text-[12.5px] text-muted">
-        {linked ? "This side is linked." : "Open the bot and tap Start."} The other side is {otherLinked ? "linked" : "not linked yet"}. Text the bot and the agent prices change orders there. Approve and send with the buttons it replies with.
-      </div>
-      <div className="mt-2 flex flex-wrap items-center gap-2">
-        {link && (
-          <a href={link} target="_blank" rel="noreferrer" className="inline-flex items-center h-8 px-3 rounded-xl bg-[#229ED9] text-white text-[13px] font-medium">
-            Open @{telegram.username}
-          </a>
-        )}
-        <button onClick={onTypeHere} className="text-[12px] text-muted hover:text-ink cursor-pointer">Type here instead</button>
-      </div>
-    </div>
-  );
-}
-
 function MessageRow({ m, project, role, act, showCard, dense, ramp }: { m: Message; project: Project; role: Role; act: Act; showCard: boolean; dense?: boolean; ramp?: boolean }) {
   if (m.author === "system") {
     return (
       <motion.div layout initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex justify-center">
-        <div className="text-[11.5px] text-muted bg-black/[0.04] rounded-full px-3 py-1">{m.body}</div>
+        <div className="text-[11.5px] text-muted bg-white border border-line rounded-full px-3 py-1 max-w-[90%] text-center">{m.body}</div>
       </motion.div>
     );
   }
@@ -244,7 +215,7 @@ function MessageRow({ m, project, role, act, showCard, dense, ramp }: { m: Messa
         <Avatar name="AI" tone="agent" size={28} />
         <div className="flex-1 min-w-0 max-w-[560px]">
           <div className="text-[11px] text-muted mb-1 flex items-center gap-1.5">
-            <span className="font-semibold text-agent">SnapContract Agent</span> · {timeAgo(m.createdAt)}
+            <span className="font-semibold text-agent">SnapContract agent</span> · {timeAgo(m.createdAt)}
           </div>
           {co && showCard ? (
             <>
@@ -270,8 +241,14 @@ function MessageRow({ m, project, role, act, showCard, dense, ramp }: { m: Messa
     <motion.div layout initial={{ opacity: 0, y: 10, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} className={clsx("flex gap-2.5 items-end", mine && "flex-row-reverse")}>
       <Avatar name={party.name} tone={m.author === "contractor" ? "ink" : "accent"} size={28} />
       <div className={clsx("max-w-[78%] flex flex-col", mine ? "items-end" : "items-start")}>
-        <div className="text-[11px] text-muted mb-1 px-1">
-          {party.name.split(" ")[0]} · {timeAgo(m.createdAt)}
+        <div className={clsx("text-[11px] text-muted mb-1 px-1 flex items-center gap-1.5", mine && "flex-row-reverse")}>
+          <span className="font-medium text-ink/70">{party.name.split(" ")[0]}</span>
+          <span>{timeAgo(m.createdAt)}</span>
+          {m.via && (
+            <span className={clsx("inline-flex items-center gap-1 font-medium", CHANNEL_META[m.via].text)}>
+              <ChannelIcon kind={m.via} size={13} /> via {CHANNEL_META[m.via].label}
+            </span>
+          )}
         </div>
         {m.kind === "transcript" ? (
           <div className={clsx("rounded-2xl border border-line bg-white p-3 text-[12.5px] font-mono whitespace-pre-wrap max-h-48 overflow-y-auto scroll-thin", mine && "rounded-br-md")}>

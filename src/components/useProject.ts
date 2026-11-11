@@ -3,20 +3,18 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { Project } from "@/lib/types";
 import type { Action } from "@/lib/actions";
 
+import type { ChannelInfo } from "@/lib/channels";
+
+export type { ChannelInfo };
+
 export interface Integrations {
-  telegram: {
-    enabled: boolean;
-    username: string | null;
-    links: { contractor: string; client: string } | null;
-    contractorLinked: boolean;
-    clientLinked: boolean;
-  };
+  channels: ChannelInfo[];
   ramp: { enabled: boolean; sandbox: boolean };
 }
 
 export function useProject(id: string) {
   const [project, setProject] = useState<Project | null>(null);
-  const [ai, setAi] = useState<"claude" | "local" | null>(null);
+  const [ai, setAi] = useState<"openai" | "claude" | "local" | null>(null);
   const [integrations, setIntegrations] = useState<Integrations | null>(null);
   const [error, setError] = useState<string | null>(null);
   const busy = useRef(false);

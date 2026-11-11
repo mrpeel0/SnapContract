@@ -1,5 +1,6 @@
 export async function register() {
   if (process.env.NEXT_RUNTIME === "nodejs") {
-    await import("./lib/telegram");
+    const { startChannels } = await import("./lib/channels");
+    startChannels();
   }
 }
