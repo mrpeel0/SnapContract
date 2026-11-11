@@ -2,6 +2,8 @@
 
 An AI agent that sits in the contractor–client conversation, catches scope changes in texts, voice notes and call transcripts, prices them from the contractor's rate sheet, and gets them approved before the budget and invoice update.
 
+**Live demo:** [snapcontract-v6sc.onrender.com](https://snapcontract-v6sc.onrender.com/) (free tier, so the first load can take ~30 s while it wakes up)
+
 ## Run it
 
 ```bash
